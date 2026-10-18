@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vite-plus";
 
 // Tests that exercise build output in `dist/` rather than source. They run after
 // `bun run build` (see the "Run edge tests" step in .github/workflows/build-and-test.yml)
