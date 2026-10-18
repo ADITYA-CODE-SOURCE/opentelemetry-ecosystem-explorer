@@ -108,8 +108,40 @@ def test_package_file_drops_unpublished_fields(registry, writer):
         "name": "instrumentation-oracledb",
         "npm_package": "@opentelemetry/instrumentation-oracledb",
         "description": "Instrumentation for instrumentation-oracledb",
+        "repository": "open-telemetry/opentelemetry-js-contrib",
         "in_auto_instrumentations_node": False,
     }
+
+
+def test_package_file_publishes_browser_modules(registry, writer):
+    modules = [
+        {
+            "name": "console",
+            "import_path": "@opentelemetry/browser-instrumentation/experimental/console",
+            "source_path": "packages/instrumentation/src/console",
+        }
+    ]
+    registry.save(
+        "browser-instrumentation",
+        "0.8.2",
+        _release(
+            "browser-instrumentation",
+            "0.8.2",
+            repository="open-telemetry/opentelemetry-browser",
+            source_path="packages/instrumentation",
+            modules=modules,
+            in_auto_instrumentations_node=False,
+        ),
+    )
+
+    run_javascript_builder(inventory_manager=registry, db_writer=writer)
+
+    package = _package_for(writer, "browser-instrumentation", "0.8.2")
+    assert package["repository"] == "open-telemetry/opentelemetry-browser"
+    assert package["modules"] == modules
+    assert package["source_path"] == "packages/instrumentation"
+    assert "component_owners" not in package
+    assert "version" not in package
 
 
 def test_package_file_keeps_published_fields(registry, writer):
