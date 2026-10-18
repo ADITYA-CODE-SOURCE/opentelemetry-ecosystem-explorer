@@ -29,13 +29,19 @@ REGISTRY_DIR = "ecosystem-registry/javascript"
 
 # Fields published per package. Everything else in the registry stays out:
 # `version` lives in index.json so releases that only bumped it share one file,
-# `repository` is the same for every package, and owners aren't published for
-# any other ecosystem either.
+# and owners aren't published for any other ecosystem either.
+# `repository` is published because browser entries are not in js-contrib, so
+# `source_path` alone does not say which repo a package came from. `modules` is
+# the browser registry payload and is published when a release has it. The next
+# database build also publishes `repository` on existing js-contrib package files
+# and changes their content hashes.
 PACKAGE_FIELDS = (
     "name",
     "npm_package",
     "description",
     "source_path",
+    "repository",
+    "modules",
     "node_engine",
     "in_auto_instrumentations_node",
     "supported_versions",
