@@ -18,7 +18,7 @@ last_updated: "2026-10-18"
 1. [x] A browser source in `js-instrumentation-watcher` that writes the package entry with `modules`
        (`name`, `import_path`, `source_path`), read at release tags. The JavaScript builder
        publishes `modules` and `repository` on the package file.
-2. `scope_name` per module, optional and left out when the pattern does not match.
+2. [x] `scope_name` per module, optional and left out when the pattern does not match.
 3. An optional `platform` field, if wanted, starting from the `web` keyword.
 4. Module names in `index.json` so search on the list page from
    [#990](https://github.com/open-telemetry/opentelemetry-ecosystem-explorer/issues/990), still in
