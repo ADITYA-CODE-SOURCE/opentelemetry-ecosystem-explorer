@@ -89,6 +89,21 @@ components:
             monotonic: true
             value_type: int
           unit: '{errors}'
+        processor_adaptive_tail_sampling_root_span_condition_multiple_matches:
+          description: Distribution of root span condition matches for traces where
+            the condition matched more than once.
+          enabled: true
+          histogram:
+            bucket_boundaries:
+            - 2
+            - 3
+            - 5
+            - 10
+            - 25
+            - 100
+            value_type: int
+          stability: development
+          unit: '{spans}'
         processor_adaptive_tail_sampling_sampler_burst_count:
           description: Cumulative number of intervals in which an adaptive sampler
             (adaptive_percentage or adaptive_throughput) detected a burst of traffic,
@@ -596,8 +611,9 @@ components:
       codeowners:
         active:
         - andrzej-stencel
-        - michalpristas
         - rogercoll
+        emeritus:
+        - michalpristas
       distributions:
       - contrib
       stability:
