@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import { render, screen } from "@testing-library/react";
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vite-plus/test";
 import App from "./App";
 import { ThemeProvider } from "./theme-context";
 

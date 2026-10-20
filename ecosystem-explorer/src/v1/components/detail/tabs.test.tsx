@@ -16,7 +16,7 @@
 
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi } from "vite-plus/test";
 
 import { AttributesTab, ConfigurationTab, DetailTabs, ExamplesTab, ReadmeTab } from "./tabs";
 

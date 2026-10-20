@@ -15,7 +15,7 @@
  */
 
 import { act, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { JavaAgentAnnouncements } from "./java-agent-announcements";
 import { useJavaAgentAnnouncements } from "../hooks/use-java-agent-announcements";
 import type { Announcement } from "../hooks/use-java-agent-announcements";

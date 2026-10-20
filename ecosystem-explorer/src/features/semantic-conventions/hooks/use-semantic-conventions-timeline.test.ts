@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vite-plus/test";
 import { renderHook, waitFor } from "@testing-library/react";
 import { useSemanticConventionsTimeline } from "./use-semantic-conventions-timeline";
 import type { TimelineData } from "../types";

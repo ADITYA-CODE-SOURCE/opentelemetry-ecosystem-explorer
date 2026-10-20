@@ -16,7 +16,7 @@
 
 import { render } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vite-plus/test";
 import { Seo } from "./seo";
 import { DEFAULT_TITLE, SITE_ORIGIN } from "@/lib/seo/constants";
 import { STATIC_ROUTE_META } from "@/lib/seo/derive";

@@ -15,7 +15,7 @@
  */
 import { render, screen } from "@testing-library/react";
 import i18n from "i18next";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 import { StatusPill, type Stability } from "./status-pill";
 
 // Locked color mapping per decision-log 2026-05-06.

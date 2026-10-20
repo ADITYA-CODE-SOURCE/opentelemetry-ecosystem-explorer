@@ -16,7 +16,7 @@
 import { render, screen } from "@testing-library/react";
 import i18n from "i18next";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import type { DataState } from "@/hooks/data-state";
 import { CollectorLandingV1 } from "./collector-landing";

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { beforeAll, describe, it, expect } from "vitest";
+import { beforeAll, describe, it, expect } from "vite-plus/test";
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve, dirname } from "node:path";

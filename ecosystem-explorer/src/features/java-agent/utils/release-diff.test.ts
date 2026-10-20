@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 import { compareReleases } from "./release-diff";
 import type { InstrumentationData, Metric } from "@/types/javaagent";
 

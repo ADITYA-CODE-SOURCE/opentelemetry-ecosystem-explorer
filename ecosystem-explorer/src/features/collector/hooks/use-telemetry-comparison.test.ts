@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import { renderHook, waitFor } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vite-plus/test";
 import { useTelemetryComparison } from "./use-telemetry-comparison";
 import * as collectorData from "@/lib/api/collector-data";
 import type { CollectorComponent } from "@/types/collector";

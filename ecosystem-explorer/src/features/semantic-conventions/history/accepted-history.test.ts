@@ -17,7 +17,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vite-plus/test";
 import { TIMELINE_EVENT_TYPES, type TimelineData } from "../types";
 import { assertValidHistory, revisionKey, validateHistory } from "./accepted-history";
 

@@ -15,7 +15,7 @@
  */
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { AboutPage } from "./about-page";
 
 const SAMPLE_JAVA_AGENT_STATS = { version_count: 5, library_count: 263 };

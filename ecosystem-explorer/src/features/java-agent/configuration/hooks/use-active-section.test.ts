@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import { renderHook, act } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vite-plus/test";
 import { useActiveSection } from "./use-active-section";
 
 function makeSection(key: string, top: number): HTMLElement {

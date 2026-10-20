@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import { renderHook, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import * as collectorData from "@/lib/api/collector-data";
 import * as javaagentData from "@/lib/api/javaagent-data";

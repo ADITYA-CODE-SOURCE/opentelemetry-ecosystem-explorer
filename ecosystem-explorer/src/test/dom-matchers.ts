@@ -15,7 +15,7 @@
  */
 import * as matchers from "@testing-library/jest-dom/matchers";
 import type { TestingLibraryMatchers } from "@testing-library/jest-dom/matchers";
-import { expect } from "vitest";
+import { expect } from "vite-plus/test";
 
 // jest-dom 7.0.1 still augments the pre-Vitest-5 Assertion<T> interface.
 // Register its matchers directly and preserve Vitest's sync/async return type.

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { expect, expectTypeOf, it } from "vitest";
+import { expect, expectTypeOf, it } from "vite-plus/test";
 
 it("preserves DOM matcher return types for sync and async assertions", async () => {
   const element = document.createElement("button");

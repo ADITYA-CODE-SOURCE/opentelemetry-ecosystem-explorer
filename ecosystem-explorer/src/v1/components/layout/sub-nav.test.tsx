@@ -15,7 +15,7 @@
  */
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 import { SubNav } from "./sub-nav";
 
 function renderSubNav(props: Parameters<typeof SubNav>[0]) {

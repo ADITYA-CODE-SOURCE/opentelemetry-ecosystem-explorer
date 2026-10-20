@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 import { configurationBuilderReducer, INITIAL_STATE } from "./configuration-builder-reducer";
 import type { ConfigurationBuilderState, ConfigValues } from "@/types/configuration-builder";
 

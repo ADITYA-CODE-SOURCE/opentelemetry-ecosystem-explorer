@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vite-plus/test";
 import type { CallbackError, ResourceKey } from "i18next";
 import { httpBackend } from "@/i18n/http-backend";
 

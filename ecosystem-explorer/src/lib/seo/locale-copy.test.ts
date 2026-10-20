@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import collectorEn from "../../../public/locales/en/collector.json";
 import homeEn from "../../../public/locales/en/home.json";
 import javaAgentEn from "../../../public/locales/en/java-agent.json";

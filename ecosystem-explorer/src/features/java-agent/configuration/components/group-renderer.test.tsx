@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import React from "react";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi } from "vite-plus/test";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { GroupRenderer } from "./group-renderer";
 import { SectionExpansionProvider } from "./section-expansion-context";

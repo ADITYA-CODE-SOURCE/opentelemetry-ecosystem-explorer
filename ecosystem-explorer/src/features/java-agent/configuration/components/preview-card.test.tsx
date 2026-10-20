@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterAll } from "vite-plus/test";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import * as downloadModule from "@/lib/download-text";
 import { PreviewCard } from "./preview-card";

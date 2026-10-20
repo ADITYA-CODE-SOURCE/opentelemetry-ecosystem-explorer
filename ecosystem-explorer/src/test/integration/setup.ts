@@ -19,7 +19,7 @@
 // module load time.
 import "fake-indexeddb/auto";
 import "@/test/dom-matchers";
-import { beforeEach, vi } from "vitest";
+import { beforeEach, vi } from "vite-plus/test";
 import { clearAllCached, closeDB } from "@/lib/api/idb-cache";
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";

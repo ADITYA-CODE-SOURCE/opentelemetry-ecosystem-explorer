@@ -20,7 +20,7 @@
 // branches build (`${route}.md`, /seo/routes.json, /agent/**) match what the
 // build actually emits. Skipped when dist/ is absent, since dist is gitignored
 // and CI builds after the unit tests run.
-import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vite-plus/test";
 import { createServer, type Server } from "node:http";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { extname, join, resolve, dirname, relative, sep } from "node:path";

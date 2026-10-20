@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vite-plus/test";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { KeyValueMapControl } from "./key-value-map-control";
 import type { KeyValueMapNode } from "@/types/configuration";

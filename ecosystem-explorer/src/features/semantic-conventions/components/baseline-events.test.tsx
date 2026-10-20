@@ -16,7 +16,7 @@
 
 import { readFileSync } from "node:fs";
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { SemanticConventionTimeline } from "@/features/semantic-conventions/components/semantic-convention-timeline";
 import type { TimelineData } from "@/features/semantic-conventions/types";
 
