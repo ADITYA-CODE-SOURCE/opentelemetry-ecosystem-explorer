@@ -306,6 +306,7 @@ components:
 - name: jaegerencodingextension
   subtype: encoding
   metadata:
+    description: This extension supports unmarshaling Jaeger data representing traces.
     display_name: Jaeger Encoding Extension
     status:
       class: extension
