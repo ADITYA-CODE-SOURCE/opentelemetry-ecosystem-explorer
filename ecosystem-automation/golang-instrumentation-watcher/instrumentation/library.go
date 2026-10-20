@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"golang.org/x/mod/semver"
 	"gopkg.in/yaml.v3"
@@ -203,6 +204,34 @@ func analyzeMetadataLibrary(metadataPath string) (*Library, error) {
 	if err := dec.Decode(&lib); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal %s: %w", metadataPath, err)
 	}
+	if err := validateConfigurationEntries(lib.Configurations, metadataPath); err != nil {
+		return nil, err
+	}
 
 	return &lib, nil
+}
+
+// validateConfigurationEntries checks only the selector shape. Shared refs are
+// intentionally left unresolved here; otelc owns reference lookup and semantic
+// validation of configuration values.
+func validateConfigurationEntries(configurations []metadata.Configuration, metadataPath string) error {
+	for i, configuration := range configurations {
+		hasDeclarativeName := configuration.DeclarativeName != nil
+		hasRef := configuration.Ref != nil
+		if hasDeclarativeName == hasRef {
+			return fmt.Errorf("invalid configurations[%d] in %s: exactly one of declarative_name or ref must be set", i, metadataPath)
+		}
+		if hasDeclarativeName && strings.TrimSpace(*configuration.DeclarativeName) == "" {
+			return fmt.Errorf("invalid configurations[%d] in %s: declarative_name must not be empty", i, metadataPath)
+		}
+		if hasRef && strings.TrimSpace(*configuration.Ref) == "" {
+			return fmt.Errorf("invalid configurations[%d] in %s: ref must not be empty", i, metadataPath)
+		}
+		if hasRef && (configuration.Name != "" || configuration.Description != "" || configuration.Type != "" ||
+			configuration.Default != nil || len(configuration.Examples) > 0 || configuration.DeclarativeType != nil ||
+			configuration.DeclarativeSchema != nil) {
+			return fmt.Errorf("invalid configurations[%d] in %s: a ref entry must not include inline configuration fields", i, metadataPath)
+		}
+	}
+	return nil
 }
