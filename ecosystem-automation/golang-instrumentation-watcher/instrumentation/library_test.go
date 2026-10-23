@@ -257,6 +257,7 @@ func TestScanMetadataRepoConfigurationEntryShape(t *testing.T) {
 		wantInline   bool
 		wantRef      bool
 		wantSchema   bool
+		wantLegacy   bool
 	}{
 		{
 			name: "inline declarative configuration",
@@ -309,9 +310,15 @@ func TestScanMetadataRepoConfigurationEntryShape(t *testing.T) {
 			wantError: "a ref entry must not include inline configuration fields",
 		},
 		{
-			name:      "neither selector",
-			config:    `- name: otel.instrumentation.http.enabled`,
-			wantError: "exactly one of declarative_name or ref",
+			name: "legacy Go-only configuration without selectors",
+			config: `- name: otel.instrumentation.http.enabled
+  type: bool
+  default: "true"`,
+			wantName:     "otel.instrumentation.http.enabled",
+			wantType:     "bool",
+			wantDefault:  "true",
+			checkDefault: true,
+			wantLegacy:   true,
 		},
 		{
 			name:      "empty declarative name",
@@ -322,6 +329,51 @@ func TestScanMetadataRepoConfigurationEntryShape(t *testing.T) {
 			name:      "empty ref",
 			config:    `- ref: ""`,
 			wantError: "ref must not be empty",
+		},
+		{
+			name:      "declarative fields require a selector",
+			config:    `- declarative_type: boolean`,
+			wantError: "declarative_type or declarative_schema requires declarative_name or ref",
+		},
+		{
+			name:      "declarative name with surrounding whitespace",
+			config:    `- declarative_name: " go.net_http.enabled "`,
+			wantError: "declarative_name must not have leading or trailing whitespace",
+		},
+		{
+			name:      "ref with surrounding whitespace",
+			config:    `- ref: " http.client.capture-request-headers "`,
+			wantError: "ref must not have leading or trailing whitespace",
+		},
+		{
+			name: "unknown declarative type",
+			config: `- declarative_name: go.net_http.enabled
+  declarative_type: str`,
+			wantError: "unsupported declarative_type \"str\"",
+		},
+		{
+			name: "schema on scalar declarative type",
+			config: `- declarative_name: go.net_http.enabled
+  declarative_type: boolean
+  declarative_schema:
+    type: object
+    properties: {}`,
+			wantError: "declarative_schema requires declarative_type structured_list",
+		},
+		{
+			name: "structured list requires schema",
+			config: `- declarative_name: go.http.client.rules
+  declarative_type: structured_list`,
+			wantError: "structured_list requires declarative_schema",
+		},
+		{
+			name: "schema must describe an object",
+			config: `- declarative_name: go.http.client.rules
+  declarative_type: structured_list
+  declarative_schema:
+    type: string
+    properties: {}`,
+			wantError: "declarative_schema type must be object",
 		},
 	}
 
@@ -355,7 +407,7 @@ func TestScanMetadataRepoConfigurationEntryShape(t *testing.T) {
 			if got := configuration.Ref != nil; got != tt.wantRef {
 				t.Errorf("ref present = %v, want %v", got, tt.wantRef)
 			}
-			if tt.wantInline {
+			if tt.wantInline || tt.wantLegacy {
 				if configuration.Name != tt.wantName {
 					t.Errorf("name = %q, want %q", configuration.Name, tt.wantName)
 				}

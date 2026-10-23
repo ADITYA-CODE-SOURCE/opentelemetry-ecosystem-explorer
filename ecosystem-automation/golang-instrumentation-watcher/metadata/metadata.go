@@ -173,7 +173,8 @@ type Installation struct {
 
 // Configuration is a single tunable option exposed by a library.
 type Configuration struct {
-	// Name is the name of the configuration option (often matching an Option type or function name).
+	// Name is the optional existing flat/instrumentation configuration property name. It is not the
+	// OpenTelemetry declarative configuration path.
 	Name string `yaml:"name,omitempty"`
 	// DeclarativeName is the fully qualified OpenTelemetry declarative configuration path.
 	DeclarativeName *string `yaml:"declarative_name,omitempty"`
@@ -182,7 +183,8 @@ type Configuration struct {
 	Ref *string `yaml:"ref,omitempty"`
 	// Description explains what the configuration option does and how it affects behavior.
 	Description string `yaml:"description,omitempty"`
-	// Type indicates the data type or Go type of the configuration option (e.g., "bool", "time.Duration").
+	// Type is the existing flat/Go option type. It retains its established meaning and is distinct
+	// from DeclarativeType.
 	Type string `yaml:"type,omitempty"`
 	// Default is the string representation of the default value for this configuration option. A nil
 	// value means no default was declared; a pointer to an empty string is an explicit empty default.
