@@ -118,6 +118,8 @@ func ScanMetadataRepo(repoPath string) (*ScanResult, error) {
 
 	var libraries []Library
 	seenNames := make(map[string]bool)
+	var catalog map[string]metadata.Configuration
+	catalogLoaded := false
 
 	for _, mf := range metaFiles {
 		lib, err := analyzeMetadataLibrary(mf.MetadataPath)
@@ -145,6 +147,9 @@ func ScanMetadataRepo(repoPath string) (*ScanResult, error) {
 
 		// Strictly validate explicitly authored versions
 		if err := lib.validateVersions(mf.MetadataPath); err != nil {
+			return nil, err
+		}
+		if err := resolveConfigurationRefs(lib, repoPath, mf.MetadataPath, &catalog, &catalogLoaded); err != nil {
 			return nil, err
 		}
 
@@ -198,67 +203,190 @@ func analyzeMetadataLibrary(metadataPath string) (*Library, error) {
 		return nil, fmt.Errorf("failed to read %s: %w", metadataPath, err)
 	}
 
+	var document yaml.Node
+	if err := yaml.Unmarshal(data, &document); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal %s: %w", metadataPath, err)
+	}
+	if err := validateConfigurationSourceNodes(&document, metadataPath); err != nil {
+		return nil, err
+	}
+
 	var lib Library
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	dec.KnownFields(true)
 	if err := dec.Decode(&lib); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal %s: %w", metadataPath, err)
 	}
-	if err := validateConfigurationEntries(lib.Configurations, metadataPath); err != nil {
+	if err := validateConfigurationValues(lib.Configurations, metadataPath); err != nil {
 		return nil, err
 	}
 
 	return &lib, nil
 }
 
-// validateConfigurationEntries validates declarative selector and type/schema
-// consistency. Entries without declarative selectors remain valid legacy
-// Go-only options. Shared refs are intentionally left unresolved here; otelc
-// owns reference lookup and full semantic validation.
-func validateConfigurationEntries(configurations []metadata.Configuration, metadataPath string) error {
-	for i, configuration := range configurations {
-		hasDeclarativeName := configuration.DeclarativeName != nil
-		hasRef := configuration.Ref != nil
-		if hasDeclarativeName && hasRef {
-			return fmt.Errorf("invalid configurations[%d] in %s: exactly one of declarative_name or ref must be set", i, metadataPath)
-		}
-		if !hasDeclarativeName && !hasRef {
-			if configuration.DeclarativeType != nil || configuration.DeclarativeSchema != nil {
-				return fmt.Errorf("invalid configurations[%d] in %s: declarative_type or declarative_schema requires declarative_name or ref", i, metadataPath)
-			}
+// validateConfigurationSourceNodes validates the source YAML before refs are
+// expanded. Checking the nodes preserves the distinction between an omitted
+// field and a present-but-empty field, which the inventory structs can't make.
+// Entries with no declarative fields remain valid legacy flat Go options.
+func validateConfigurationSourceNodes(document *yaml.Node, metadataPath string) error {
+	if len(document.Content) != 1 || document.Content[0].Kind != yaml.MappingNode {
+		return fmt.Errorf("invalid metadata document in %s: expected a mapping", metadataPath)
+	}
+	var configurationsNode *yaml.Node
+	root := document.Content[0]
+	for i := 0; i < len(root.Content); i += 2 {
+		if root.Content[i].Value != "configurations" {
 			continue
 		}
-		if hasDeclarativeName && strings.TrimSpace(*configuration.DeclarativeName) == "" {
-			return fmt.Errorf("invalid configurations[%d] in %s: declarative_name must not be empty", i, metadataPath)
+		if configurationsNode != nil {
+			return fmt.Errorf("duplicate configurations key in %s", metadataPath)
 		}
-		if hasDeclarativeName && strings.TrimSpace(*configuration.DeclarativeName) != *configuration.DeclarativeName {
-			return fmt.Errorf("invalid configurations[%d] in %s: declarative_name must not have leading or trailing whitespace", i, metadataPath)
+		configurationsNode = root.Content[i+1]
+	}
+	if configurationsNode == nil {
+		return nil
+	}
+	if configurationsNode.Kind != yaml.SequenceNode {
+		return fmt.Errorf("configurations in %s must be a sequence", metadataPath)
+	}
+	for i, node := range configurationsNode.Content {
+		entrySource := fmt.Sprintf("invalid configurations[%d] in %s", i, metadataPath)
+		if node.Kind != yaml.MappingNode {
+			return fmt.Errorf("%s: expected a mapping", entrySource)
 		}
-		if hasRef && strings.TrimSpace(*configuration.Ref) == "" {
-			return fmt.Errorf("invalid configurations[%d] in %s: ref must not be empty", i, metadataPath)
-		}
-		if hasRef && strings.TrimSpace(*configuration.Ref) != *configuration.Ref {
-			return fmt.Errorf("invalid configurations[%d] in %s: ref must not have leading or trailing whitespace", i, metadataPath)
-		}
-		if hasRef && (configuration.Name != "" || configuration.Description != "" || configuration.Type != "" ||
-			configuration.Default != nil || len(configuration.Examples) > 0 || configuration.DeclarativeType != nil ||
-			configuration.DeclarativeSchema != nil) {
-			return fmt.Errorf("invalid configurations[%d] in %s: a ref entry must not include inline configuration fields", i, metadataPath)
-		}
-		if configuration.DeclarativeType != nil && !isSupportedDeclarativeType(*configuration.DeclarativeType) {
-			return fmt.Errorf("invalid configurations[%d] in %s: unsupported declarative_type %q", i, metadataPath, *configuration.DeclarativeType)
-		}
-		if configuration.DeclarativeSchema != nil {
-			if configuration.DeclarativeType == nil || *configuration.DeclarativeType != "structured_list" {
-				return fmt.Errorf("invalid configurations[%d] in %s: declarative_schema requires declarative_type structured_list", i, metadataPath)
+		fields := make(map[string]*yaml.Node, len(node.Content)/2)
+		for j := 0; j < len(node.Content); j += 2 {
+			keyNode, valueNode := node.Content[j], node.Content[j+1]
+			if keyNode.Kind != yaml.ScalarNode || keyNode.Tag != "!!str" {
+				return fmt.Errorf("%s: configuration keys must be strings", entrySource)
 			}
-			if configuration.DeclarativeSchema.Type != "object" {
-				return fmt.Errorf("invalid configurations[%d] in %s: declarative_schema type must be object", i, metadataPath)
+			if _, exists := fields[keyNode.Value]; exists {
+				return fmt.Errorf("%s: duplicate field %q", entrySource, keyNode.Value)
 			}
+			fields[keyNode.Value] = valueNode
+		}
+
+		_, hasDeclarativeName := fields["declarative_name"]
+		_, hasRef := fields["ref"]
+		if hasDeclarativeName && hasRef {
+			return fmt.Errorf("%s: exactly one of declarative_name or ref must be set", entrySource)
+		}
+		if hasDeclarativeName {
+			if err := validateSelectorString(fields["declarative_name"], "declarative_name", entrySource); err != nil {
+				return err
+			}
+		}
+		if hasRef {
+			if err := validateSelectorString(fields["ref"], "ref", entrySource); err != nil {
+				return err
+			}
+			for _, field := range []string{"name", "description", "type", "default", "examples", "declarative_type", "declarative_schema", "default_behavior"} {
+				if _, exists := fields[field]; exists {
+					return fmt.Errorf("%s: a ref entry must not include inline configuration field %q", entrySource, field)
+				}
+			}
+		}
+		if !hasDeclarativeName && !hasRef {
+			_, hasType := fields["declarative_type"]
+			_, hasSchema := fields["declarative_schema"]
+			_, hasDefaultBehavior := fields["default_behavior"]
+			if hasType || hasSchema || hasDefaultBehavior {
+				return fmt.Errorf("%s: declarative_type, declarative_schema, or default_behavior requires declarative_name or ref", entrySource)
+			}
+		}
+		for _, field := range []string{"name", "description", "type", "default_behavior"} {
+			if value, exists := fields[field]; exists && (value.Kind != yaml.ScalarNode || value.Tag != "!!str") {
+				return fmt.Errorf("%s: %s must be a string", entrySource, field)
+			}
+		}
+		if defaultNode, exists := fields["default"]; exists &&
+			!isDefaultScalar(defaultNode) {
+			return fmt.Errorf("%s: default must be a string, boolean, integer, or float scalar", entrySource)
+		}
+		if declarativeType, exists := fields["declarative_type"]; exists {
+			if declarativeType.Kind != yaml.ScalarNode || declarativeType.Tag != "!!str" {
+				return fmt.Errorf("%s: declarative_type must be a string", entrySource)
+			}
+			if !isSupportedDeclarativeType(declarativeType.Value) {
+				return fmt.Errorf("%s: unsupported declarative_type %q", entrySource, declarativeType.Value)
+			}
+		}
+		if schema, exists := fields["declarative_schema"]; exists && schema.Kind != yaml.MappingNode {
+			return fmt.Errorf("%s: declarative_schema must be a mapping", entrySource)
+		}
+	}
+	return nil
+}
+
+func validateConfigurationValues(configurations []metadata.Configuration, metadataPath string) error {
+	for i, configuration := range configurations {
+		entrySource := fmt.Sprintf("invalid configurations[%d] in %s", i, metadataPath)
+		if configuration.DeclarativeSchema != nil &&
+			(configuration.DeclarativeType == nil || *configuration.DeclarativeType != "structured_list") {
+			return fmt.Errorf("%s: declarative_schema requires declarative_type structured_list", entrySource)
 		}
 		if configuration.DeclarativeType != nil && *configuration.DeclarativeType == "structured_list" && configuration.DeclarativeSchema == nil {
-			return fmt.Errorf("invalid configurations[%d] in %s: structured_list requires declarative_schema", i, metadataPath)
+			return fmt.Errorf("%s: structured_list requires declarative_schema", entrySource)
 		}
+		if configuration.DeclarativeSchema != nil && configuration.DeclarativeSchema.Type != "object" {
+			return fmt.Errorf("%s: declarative_schema type must be object", entrySource)
+		}
+	}
+	return nil
+}
+
+func validateSelectorString(node *yaml.Node, field, source string) error {
+	if node.Kind != yaml.ScalarNode || node.Tag != "!!str" {
+		return fmt.Errorf("%s: %s must be a string", source, field)
+	}
+	if strings.TrimSpace(node.Value) == "" {
+		return fmt.Errorf("%s: %s must not be empty", source, field)
+	}
+	if strings.TrimSpace(node.Value) != node.Value {
+		return fmt.Errorf("%s: %s must not have leading or trailing whitespace", source, field)
+	}
+	return nil
+}
+
+func isDefaultScalar(node *yaml.Node) bool {
+	if node.Kind != yaml.ScalarNode {
+		return false
+	}
+	switch node.Tag {
+	case "!!str", "!!bool", "!!int", "!!float":
+		return true
+	default:
+		return false
+	}
+}
+
+func resolveConfigurationRefs(
+	library *Library,
+	repoPath string,
+	metadataPath string,
+	catalog *map[string]metadata.Configuration,
+	catalogLoaded *bool,
+) error {
+	for i, sourceConfiguration := range library.Configurations {
+		if sourceConfiguration.Ref == nil {
+			continue
+		}
+		if !*catalogLoaded {
+			definitions, err := readConfigurationCatalog(repoPath)
+			if err != nil {
+				return fmt.Errorf("resolve configurations in %s: %w", metadataPath, err)
+			}
+			*catalog = definitions
+			*catalogLoaded = true
+		}
+		definition, exists := (*catalog)[*sourceConfiguration.Ref]
+		if !exists {
+			return fmt.Errorf("unknown configuration ref %q in %s: no matching definition in %s", *sourceConfiguration.Ref, metadataPath, filepath.Join(repoPath, filepath.FromSlash(configurationCatalogPath)))
+		}
+		resolved := cloneConfiguration(definition)
+		ref := *sourceConfiguration.Ref
+		resolved.Ref = &ref
+		library.Configurations[i] = resolved
 	}
 	return nil
 }

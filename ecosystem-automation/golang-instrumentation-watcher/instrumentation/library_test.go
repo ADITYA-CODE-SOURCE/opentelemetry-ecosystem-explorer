@@ -111,6 +111,34 @@ func writeMetadata(t *testing.T, root, relDir, content string) {
 	}
 }
 
+func writeConfigurationCatalog(t *testing.T, root string) {
+	t.Helper()
+	path := filepath.Join(root, filepath.FromSlash(configurationCatalogPath))
+	if err := os.MkdirAll(filepath.Dir(path), dirPerm); err != nil {
+		t.Fatal(err)
+	}
+	const catalog = `catalog_version: 1
+source:
+  repository: open-telemetry/opentelemetry-configuration
+  release: v1.2.0
+  commit: 3b04ae78576ec407854d734eb4da4f78a67f902c
+  file: schema/instrumentation.yaml
+definitions:
+  general.http.client.request_captured_headers/development:
+    declarative_name: general.http.client.request_captured_headers/development
+    description: Configure headers to capture for outbound HTTP requests.
+    declarative_type: list
+    default_behavior: No outbound request headers are captured.
+  go.test.option:
+    declarative_name: go.test.option
+    description: Test-only Go-owned catalog entry.
+    declarative_type: boolean
+`
+	if err := os.WriteFile(path, []byte(catalog), filePerm); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestScanMetadataRepo(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -247,17 +275,22 @@ instalation: # typo should fail strict decoding
 
 func TestScanMetadataRepoConfigurationEntryShape(t *testing.T) {
 	tests := []struct {
-		name         string
-		config       string
-		wantError    string
-		wantName     string
-		wantType     string
-		wantDefault  string
-		checkDefault bool
-		wantInline   bool
-		wantRef      bool
-		wantSchema   bool
-		wantLegacy   bool
+		name                string
+		config              string
+		wantError           string
+		wantName            string
+		wantType            string
+		wantDefault         string
+		checkDefault        bool
+		wantInline          bool
+		wantRef             bool
+		wantSchema          bool
+		wantLegacy          bool
+		wantDeclarativeName string
+		wantRefValue        string
+		wantDeclarativeType string
+		wantDescription     string
+		wantDefaultBehavior string
 	}{
 		{
 			name: "inline declarative configuration",
@@ -266,11 +299,12 @@ func TestScanMetadataRepoConfigurationEntryShape(t *testing.T) {
   description: Enables HTTP instrumentation.
   type: boolean
   default: true`,
-			wantName:     "otel.instrumentation.http.enabled",
-			wantType:     "boolean",
-			wantDefault:  "true",
-			checkDefault: true,
-			wantInline:   true,
+			wantName:            "otel.instrumentation.http.enabled",
+			wantType:            "boolean",
+			wantDefault:         "true",
+			checkDefault:        true,
+			wantInline:          true,
+			wantDeclarativeName: "go.net_http.enabled",
 		},
 		{
 			name: "structured declarative configuration",
@@ -289,25 +323,46 @@ func TestScanMetadataRepoConfigurationEntryShape(t *testing.T) {
       enabled:
         type: boolean
         default: false`,
-			wantInline: true,
-			wantSchema: true,
+			wantInline:          true,
+			wantSchema:          true,
+			wantDeclarativeName: "go.http.client.rules",
 		},
 		{
-			name:    "shared reference",
-			config:  `- ref: http.client.capture-request-headers`,
-			wantRef: true,
+			name:                "shared reference resolves and preserves its ref",
+			config:              `- ref: general.http.client.request_captured_headers/development`,
+			wantRef:             true,
+			wantRefValue:        "general.http.client.request_captured_headers/development",
+			wantDeclarativeName: "general.http.client.request_captured_headers/development",
+			wantDeclarativeType: "list",
+			wantDescription:     "Configure headers to capture for outbound HTTP requests.",
+			wantDefaultBehavior: "No outbound request headers are captured.",
+		},
+		{
+			name:                "Go-owned reference resolves",
+			config:              `- ref: go.test.option`,
+			wantRef:             true,
+			wantRefValue:        "go.test.option",
+			wantDeclarativeName: "go.test.option",
+			wantDeclarativeType: "boolean",
+			wantDescription:     "Test-only Go-owned catalog entry.",
 		},
 		{
 			name: "both selectors",
 			config: `- declarative_name: go.net_http.enabled
-  ref: http.client.capture-request-headers`,
+  ref: general.http.client.request_captured_headers/development`,
 			wantError: "exactly one of declarative_name or ref",
 		},
 		{
 			name: "shared reference with inline fields",
-			config: `- ref: http.client.capture-request-headers
+			config: `- ref: general.http.client.request_captured_headers/development
   type: list`,
-			wantError: "a ref entry must not include inline configuration fields",
+			wantError: `a ref entry must not include inline configuration field "type"`,
+		},
+		{
+			name: "shared reference with empty inline field",
+			config: `- ref: general.http.client.request_captured_headers/development
+  description: ""`,
+			wantError: `a ref entry must not include inline configuration field "description"`,
 		},
 		{
 			name: "legacy Go-only configuration without selectors",
@@ -319,6 +374,17 @@ func TestScanMetadataRepoConfigurationEntryShape(t *testing.T) {
 			wantDefault:  "true",
 			checkDefault: true,
 			wantLegacy:   true,
+		},
+		{
+			name: "non-scalar top-level default is rejected",
+			config: `- declarative_name: go.net_http.enabled
+  default: [true]`,
+			wantError: "default must be a string, boolean, integer, or float scalar",
+		},
+		{
+			name:      "null ref selector is rejected",
+			config:    `- ref: null`,
+			wantError: "ref must be a string",
 		},
 		{
 			name:      "empty declarative name",
@@ -333,7 +399,7 @@ func TestScanMetadataRepoConfigurationEntryShape(t *testing.T) {
 		{
 			name:      "declarative fields require a selector",
 			config:    `- declarative_type: boolean`,
-			wantError: "declarative_type or declarative_schema requires declarative_name or ref",
+			wantError: "declarative_type, declarative_schema, or default_behavior requires declarative_name or ref",
 		},
 		{
 			name:      "declarative name with surrounding whitespace",
@@ -342,7 +408,7 @@ func TestScanMetadataRepoConfigurationEntryShape(t *testing.T) {
 		},
 		{
 			name:      "ref with surrounding whitespace",
-			config:    `- ref: " http.client.capture-request-headers "`,
+			config:    `- ref: " general.http.client.request_captured_headers/development "`,
 			wantError: "ref must not have leading or trailing whitespace",
 		},
 		{
@@ -381,6 +447,7 @@ func TestScanMetadataRepoConfigurationEntryShape(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			root := t.TempDir()
 			writeGoMod(t, root, "instrumentation/dummy", "module go.opentelemetry.io/otelc/dummy\n\ngo 1.25.0\n")
+			writeConfigurationCatalog(t, root)
 			writeMetadata(t, root, "instrumentation/dummy", "name: test-lib\nconfigurations:\n"+tt.config+"\n")
 
 			result, err := ScanMetadataRepo(root)
@@ -401,11 +468,27 @@ func TestScanMetadataRepoConfigurationEntryShape(t *testing.T) {
 				t.Fatalf("configurations = %d, want 1", len(configurations))
 			}
 			configuration := configurations[0]
-			if got := configuration.DeclarativeName != nil; got != tt.wantInline {
-				t.Errorf("declarative_name present = %v, want %v", got, tt.wantInline)
+			if tt.wantDeclarativeName == "" {
+				if configuration.DeclarativeName != nil {
+					t.Errorf("declarative_name = %q, want absent", *configuration.DeclarativeName)
+				}
+			} else if configuration.DeclarativeName == nil || *configuration.DeclarativeName != tt.wantDeclarativeName {
+				t.Errorf("declarative_name = %v, want %q", configuration.DeclarativeName, tt.wantDeclarativeName)
 			}
 			if got := configuration.Ref != nil; got != tt.wantRef {
 				t.Errorf("ref present = %v, want %v", got, tt.wantRef)
+			}
+			if tt.wantRefValue != "" && (configuration.Ref == nil || *configuration.Ref != tt.wantRefValue) {
+				t.Errorf("ref = %v, want %q", configuration.Ref, tt.wantRefValue)
+			}
+			if tt.wantDeclarativeType != "" && (configuration.DeclarativeType == nil || *configuration.DeclarativeType != tt.wantDeclarativeType) {
+				t.Errorf("declarative_type = %v, want %q", configuration.DeclarativeType, tt.wantDeclarativeType)
+			}
+			if tt.wantDescription != "" && configuration.Description != tt.wantDescription {
+				t.Errorf("description = %q, want %q", configuration.Description, tt.wantDescription)
+			}
+			if configuration.DefaultBehavior != tt.wantDefaultBehavior {
+				t.Errorf("default_behavior = %q, want %q", configuration.DefaultBehavior, tt.wantDefaultBehavior)
 			}
 			if tt.wantInline || tt.wantLegacy {
 				if configuration.Name != tt.wantName {
@@ -426,10 +509,6 @@ func TestScanMetadataRepoConfigurationEntryShape(t *testing.T) {
 					}
 				}
 			}
-			if tt.wantRef && (configuration.Ref == nil || *configuration.Ref != "http.client.capture-request-headers") {
-				t.Errorf("ref = %v, want http.client.capture-request-headers", configuration.Ref)
-			}
-
 			serialized, err := yaml.Marshal(result.Libraries[0])
 			if err != nil {
 				t.Fatalf("Marshal() error = %v", err)
@@ -442,6 +521,38 @@ func TestScanMetadataRepoConfigurationEntryShape(t *testing.T) {
 				t.Errorf("round-tripped configurations = %#v, want %#v", roundTripped.Configurations, configurations)
 			}
 		})
+	}
+}
+
+func TestScanMetadataRepoUnknownConfigurationRef(t *testing.T) {
+	root := t.TempDir()
+	writeGoMod(t, root, "instrumentation/dummy", "module go.opentelemetry.io/otelc/dummy\n\ngo 1.25.0\n")
+	writeConfigurationCatalog(t, root)
+	writeMetadata(t, root, "instrumentation/dummy", `name: test-lib
+configurations:
+  - ref: general.unknown/development
+`)
+
+	_, err := ScanMetadataRepo(root)
+	if err == nil || !strings.Contains(err.Error(), `unknown configuration ref "general.unknown/development"`) {
+		t.Fatalf("ScanMetadataRepo() error = %v, want unknown ref diagnostic", err)
+	}
+	if !strings.Contains(err.Error(), filepath.Join(root, "instrumentation", "dummy", "metadata.yaml")) {
+		t.Errorf("ScanMetadataRepo() error = %v, want metadata path", err)
+	}
+}
+
+func TestScanMetadataRepoConfigurationRefRequiresCatalog(t *testing.T) {
+	root := t.TempDir()
+	writeGoMod(t, root, "instrumentation/dummy", "module go.opentelemetry.io/otelc/dummy\n\ngo 1.25.0\n")
+	writeMetadata(t, root, "instrumentation/dummy", `name: test-lib
+configurations:
+  - ref: general.http.client.request_captured_headers/development
+`)
+
+	_, err := ScanMetadataRepo(root)
+	if err == nil || !strings.Contains(err.Error(), configurationCatalogPath) {
+		t.Fatalf("ScanMetadataRepo() error = %v, want catalog-path diagnostic", err)
 	}
 }
 

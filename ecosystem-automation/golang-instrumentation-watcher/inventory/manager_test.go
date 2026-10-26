@@ -78,7 +78,8 @@ func TestSaveAndLoadDeclarativeConfiguration(t *testing.T) {
 	declarativeName := "go.net_http.enabled"
 	declarativeType := "structured_list"
 	defaultValue := ""
-	ref := "http.client.capture-request-headers"
+	ref := "general.http.client.request_captured_headers/development"
+	resolvedType := "list"
 	want := []metadata.Configuration{
 		{
 			Name:            "otel.instrumentation.http.rules",
@@ -101,7 +102,13 @@ func TestSaveAndLoadDeclarativeConfiguration(t *testing.T) {
 				},
 			},
 		},
-		{Ref: &ref},
+		{
+			Ref:             &ref,
+			DeclarativeName: &ref,
+			Description:     "Configure headers to capture for outbound HTTP requests.",
+			DeclarativeType: &resolvedType,
+			DefaultBehavior: "No outbound request headers are captured.",
+		},
 	}
 	input := instrumentation.Library{
 		Metadata: metadata.Metadata{

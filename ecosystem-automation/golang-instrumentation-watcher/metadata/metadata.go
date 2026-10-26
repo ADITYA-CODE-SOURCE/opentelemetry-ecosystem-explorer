@@ -179,7 +179,7 @@ type Configuration struct {
 	// DeclarativeName is the fully qualified OpenTelemetry declarative configuration path.
 	DeclarativeName *string `yaml:"declarative_name,omitempty"`
 	// Ref identifies a shared configuration definition. References are preserved by the watcher
-	// and resolved by the consuming instrumentation tool.
+	// and accompanied by resolved catalog fields in the emitted inventory.
 	Ref *string `yaml:"ref,omitempty"`
 	// Description explains what the configuration option does and how it affects behavior.
 	Description string `yaml:"description,omitempty"`
@@ -197,6 +197,8 @@ type Configuration struct {
 	// DeclarativeSchema describes the supported structured declarative value shape. Property defaults
 	// and examples intentionally retain native YAML values.
 	DeclarativeSchema *DeclarativeSchema `yaml:"declarative_schema,omitempty"`
+	// DefaultBehavior describes the default behavior when the declarative option is unset.
+	DefaultBehavior string `yaml:"default_behavior,omitempty"`
 }
 
 // DeclarativeSchema is the JSON-Schema-style subset used for structured declarative configuration.
