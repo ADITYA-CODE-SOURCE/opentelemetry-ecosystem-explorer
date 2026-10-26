@@ -80,6 +80,42 @@ and writes the inventory. `ScanRepo` walks the two subtrees for `go.mod` files (
 `target_module`, `display_name`). `ScanMetadataRepo` instead walks the repository for
 `metadata.yaml` files and parses them directly.
 
+## Go configuration metadata
+
+For the `metadata` scanning strategy, each source configuration has exactly one
+of `name` or `ref`. `name` is the declarative path relative to
+`instrumentation/development`; `type` is `boolean`, `string`, `int`, `map`, `list`,
+or `structured_list`. `schema` describes structured-list items. The Go format
+does not duplicate these as `declarative_name`, `declarative_type`, or
+`declarative_schema`, and does not accept entries without a selector.
+
+```yaml
+configurations:
+  - name: go.my_instrumentation.enabled
+    type: boolean
+    default: "true"
+  - ref: general.http.client.request_captured_headers
+```
+
+The watcher lazily loads `tool/internal/configuration/catalog.yaml` from the exact
+otelc checkout being scanned. General definitions derive from a pinned
+OpenTelemetry Configuration release; otelc owns Go-specific definitions. Unknown
+refs and missing or invalid catalogs fail the scan with a source-path diagnostic.
+Repositories without refs do not need a catalog. Scanning never downloads a
+catalog or runs otelc code.
+
+Input refs do not allow inline overrides. Inventory records preserve the raw
+`ref` and carry resolved `name`, `type`, description, and schema fields. Loading
+inventory does not reapply source-only selector exclusivity. `file_format` stays
+at `0.1`; inventories without configurations remain readable and are not backfilled.
+Top-level defaults remain strings (boolean/numeric YAML scalars are normalized),
+while schema property defaults and examples retain their native YAML types.
+Optional `default_behavior` describes prose behavior, not a machine-readable
+default. This watcher publishes Go inventory; it does not change Java's metadata
+format or add a Go UI/database-builder integration.
+Collection defaults are YAML-encoded strings such as `"[]"` or `"{}"`;
+structured-list defaults must match their item schema.
+
 ## Package layout
 
 | Package           | Responsibility                                                                   |

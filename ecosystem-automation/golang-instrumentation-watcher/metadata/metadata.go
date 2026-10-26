@@ -173,43 +173,37 @@ type Installation struct {
 
 // Configuration is a single tunable option exposed by a library.
 type Configuration struct {
-	// Name is the optional existing flat/instrumentation configuration property name. It is not the
-	// OpenTelemetry declarative configuration path.
+	// Name is the OpenTelemetry configuration path relative to instrumentation/development.
+	// Source metadata requires exactly one of Name or Ref. Resolved inventory retains both.
 	Name string `yaml:"name,omitempty"`
-	// DeclarativeName is the fully qualified OpenTelemetry declarative configuration path.
-	DeclarativeName *string `yaml:"declarative_name,omitempty"`
 	// Ref identifies a shared configuration definition. References are preserved by the watcher
 	// and accompanied by resolved catalog fields in the emitted inventory.
 	Ref *string `yaml:"ref,omitempty"`
 	// Description explains what the configuration option does and how it affects behavior.
 	Description string `yaml:"description,omitempty"`
-	// Type is the existing flat/Go option type. It retains its established meaning and is distinct
-	// from DeclarativeType.
+	// Type is boolean, string, int, map, list, or structured_list for an inline definition.
 	Type string `yaml:"type,omitempty"`
 	// Default is the string representation of the default value for this configuration option. A nil
 	// value means no default was declared; a pointer to an empty string is an explicit empty default.
 	Default *string `yaml:"default,omitempty"`
 	// Examples provides optional code snippets or values demonstrating how to set this configuration.
 	Examples []string `yaml:"examples,omitempty"`
-	// DeclarativeType describes the value shape used in OpenTelemetry declarative configuration when
-	// it differs from the flat configuration type.
-	DeclarativeType *string `yaml:"declarative_type,omitempty"`
-	// DeclarativeSchema describes the supported structured declarative value shape. Property defaults
+	// Schema describes the item object shape for a structured_list. Property defaults
 	// and examples intentionally retain native YAML values.
-	DeclarativeSchema *DeclarativeSchema `yaml:"declarative_schema,omitempty"`
+	Schema *ConfigurationSchema `yaml:"schema,omitempty"`
 	// DefaultBehavior describes the default behavior when the declarative option is unset.
 	DefaultBehavior string `yaml:"default_behavior,omitempty"`
 }
 
-// DeclarativeSchema is the JSON-Schema-style subset used for structured declarative configuration.
-type DeclarativeSchema struct {
-	Type       string                         `yaml:"type"`
-	Required   []string                       `yaml:"required,omitempty"`
-	Properties map[string]DeclarativeProperty `yaml:"properties"`
+// ConfigurationSchema is the object-schema subset used for structured_list items.
+type ConfigurationSchema struct {
+	Type       string                           `yaml:"type"`
+	Required   []string                         `yaml:"required,omitempty"`
+	Properties map[string]ConfigurationProperty `yaml:"properties"`
 }
 
-// DeclarativeProperty describes one property in a [DeclarativeSchema].
-type DeclarativeProperty struct {
+// ConfigurationProperty describes one property in a [ConfigurationSchema].
+type ConfigurationProperty struct {
 	Type        string `yaml:"type"`
 	Description string `yaml:"description,omitempty"`
 	Default     any    `yaml:"default,omitempty"`

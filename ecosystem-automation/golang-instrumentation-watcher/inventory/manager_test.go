@@ -1,6 +1,7 @@
 package inventory
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -75,24 +76,20 @@ func TestSaveAndLoad(t *testing.T) {
 func TestSaveAndLoadDeclarativeConfiguration(t *testing.T) {
 	m := NewManager(t.TempDir())
 
-	declarativeName := "go.net_http.enabled"
-	declarativeType := "structured_list"
-	defaultValue := ""
-	ref := "general.http.client.request_captured_headers/development"
-	resolvedType := "list"
+	defaultValue := "[]"
+	emptyDefault := ""
+	ref := "general.http.client.request_captured_headers"
 	want := []metadata.Configuration{
 		{
-			Name:            "otel.instrumentation.http.rules",
-			DeclarativeName: &declarativeName,
-			Description:     "HTTP rule configuration.",
-			Type:            "list",
-			Default:         &defaultValue,
-			Examples:        []string{"[]"},
-			DeclarativeType: &declarativeType,
-			DeclarativeSchema: &metadata.DeclarativeSchema{
+			Name:        "go.net_http.rules",
+			Description: "HTTP rule configuration.",
+			Type:        "structured_list",
+			Default:     &defaultValue,
+			Examples:    []string{"[]"},
+			Schema: &metadata.ConfigurationSchema{
 				Type:     "object",
 				Required: []string{"enabled"},
-				Properties: map[string]metadata.DeclarativeProperty{
+				Properties: map[string]metadata.ConfigurationProperty{
 					"enabled": {
 						Type:        "boolean",
 						Description: "Whether the rule is enabled.",
@@ -104,11 +101,12 @@ func TestSaveAndLoadDeclarativeConfiguration(t *testing.T) {
 		},
 		{
 			Ref:             &ref,
-			DeclarativeName: &ref,
+			Name:            ref,
 			Description:     "Configure headers to capture for outbound HTTP requests.",
-			DeclarativeType: &resolvedType,
+			Type:            "list",
 			DefaultBehavior: "No outbound request headers are captured.",
 		},
+		{Name: "go.net_http.label", Type: "string", Default: &emptyDefault},
 	}
 	input := instrumentation.Library{
 		Metadata: metadata.Metadata{
@@ -132,6 +130,99 @@ func TestSaveAndLoadDeclarativeConfiguration(t *testing.T) {
 	}
 	if got := loaded.Libraries[0].Configurations; !reflect.DeepEqual(got, want) {
 		t.Errorf("configurations = %#v, want %#v", got, want)
+	}
+}
+
+func TestScanMetadataInventoryRoundTrip(t *testing.T) {
+	root := t.TempDir()
+	moduleDir := filepath.Join(root, "instrumentation", "dummy")
+	catalogDir := filepath.Join(root, "tool", "internal", "configuration")
+	for _, dir := range []string{moduleDir, catalogDir} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	files := map[string]string{
+		filepath.Join(moduleDir, "go.mod"): "module example.com/hooks\n\ngo 1.26.0\n",
+		filepath.Join(moduleDir, "metadata.yaml"): `name: example
+configurations:
+  - ref: general.http.client.request_captured_headers
+  - name: go.example.enabled
+    type: boolean
+    default: false
+`,
+		filepath.Join(catalogDir, "catalog.yaml"): `catalog_version: 1
+source:
+  repository: open-telemetry/opentelemetry-configuration
+  release: v1.2.0
+  commit: 3b04ae78576ec407854d734eb4da4f78a67f902c
+  file: schema/instrumentation.yaml
+definitions:
+  general.http.client.request_captured_headers:
+    name: general.http.client.request_captured_headers
+    type: list
+    description: Configure request headers.
+    default_behavior: No headers are captured.
+`,
+	}
+	for path, content := range files {
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	scanned, err := instrumentation.ScanMetadataRepo(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := NewManager(t.TempDir())
+	if err := m.Save("v0.1.0", scanned.Libraries); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := m.Load("v0.1.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(loaded.Libraries, scanned.Libraries) || loaded.FileFormat != 0.1 {
+		t.Fatalf("inventory did not preserve scan: %#v", loaded)
+	}
+	resolved := loaded.Libraries[0].Configurations[0]
+	if resolved.Name != "general.http.client.request_captured_headers" || resolved.Ref == nil || *resolved.Ref != resolved.Name || resolved.Type != "list" || resolved.Description == "" {
+		t.Fatalf("ref did not reach inventory with resolved fields: %#v", resolved)
+	}
+	if loaded.Libraries[0].Configurations[1].Default == nil || *loaded.Libraries[0].Configurations[1].Default != "false" {
+		t.Fatal("top-level false default must remain a string")
+	}
+	path := filepath.Join(m.VersionDir("v0.1.0"), "instrumentation.yaml")
+	first, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Save("v0.1.0", loaded.Libraries); err != nil {
+		t.Fatal(err)
+	}
+	second, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(first, second) {
+		t.Fatal("repeated inventory serialization must be deterministic")
+	}
+}
+
+func TestLoadHistoricalInventoryWithoutConfigurations(t *testing.T) {
+	m := NewManager(t.TempDir())
+	if err := os.MkdirAll(m.VersionDir("v0.1.0"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(m.VersionDir("v0.1.0"), "instrumentation.yaml"), []byte("file_format: 0.1\nlibraries:\n  - name: old-library\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := m.Load("v0.1.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(loaded.Libraries) != 1 || loaded.Libraries[0].Name != "old-library" || len(loaded.Libraries[0].Configurations) != 0 {
+		t.Fatalf("historical inventory must remain readable: %#v", loaded)
 	}
 }
 

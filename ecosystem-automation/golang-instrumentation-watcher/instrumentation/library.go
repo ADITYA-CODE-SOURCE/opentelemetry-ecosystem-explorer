@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	"golang.org/x/mod/semver"
@@ -227,7 +228,7 @@ func analyzeMetadataLibrary(metadataPath string) (*Library, error) {
 // validateConfigurationSourceNodes validates the source YAML before refs are
 // expanded. Checking the nodes preserves the distinction between an omitted
 // field and a present-but-empty field, which the inventory structs can't make.
-// Entries with no declarative fields remain valid legacy flat Go options.
+// Every entry requires a name (inline definition) or a ref, never both.
 func validateConfigurationSourceNodes(document *yaml.Node, metadataPath string) error {
 	if len(document.Content) != 1 || document.Content[0].Kind != yaml.MappingNode {
 		return fmt.Errorf("invalid metadata document in %s: expected a mapping", metadataPath)
@@ -266,13 +267,13 @@ func validateConfigurationSourceNodes(document *yaml.Node, metadataPath string) 
 			fields[keyNode.Value] = valueNode
 		}
 
-		_, hasDeclarativeName := fields["declarative_name"]
+		_, hasName := fields["name"]
 		_, hasRef := fields["ref"]
-		if hasDeclarativeName && hasRef {
-			return fmt.Errorf("%s: exactly one of declarative_name or ref must be set", entrySource)
+		if hasName == hasRef {
+			return fmt.Errorf("%s: exactly one of name or ref must be set", entrySource)
 		}
-		if hasDeclarativeName {
-			if err := validateSelectorString(fields["declarative_name"], "declarative_name", entrySource); err != nil {
+		if hasName {
+			if err := validateSelectorString(fields["name"], "name", entrySource); err != nil {
 				return err
 			}
 		}
@@ -280,18 +281,10 @@ func validateConfigurationSourceNodes(document *yaml.Node, metadataPath string) 
 			if err := validateSelectorString(fields["ref"], "ref", entrySource); err != nil {
 				return err
 			}
-			for _, field := range []string{"name", "description", "type", "default", "examples", "declarative_type", "declarative_schema", "default_behavior"} {
+			for _, field := range []string{"name", "description", "type", "default", "examples", "schema", "default_behavior"} {
 				if _, exists := fields[field]; exists {
 					return fmt.Errorf("%s: a ref entry must not include inline configuration field %q", entrySource, field)
 				}
-			}
-		}
-		if !hasDeclarativeName && !hasRef {
-			_, hasType := fields["declarative_type"]
-			_, hasSchema := fields["declarative_schema"]
-			_, hasDefaultBehavior := fields["default_behavior"]
-			if hasType || hasSchema || hasDefaultBehavior {
-				return fmt.Errorf("%s: declarative_type, declarative_schema, or default_behavior requires declarative_name or ref", entrySource)
 			}
 		}
 		for _, field := range []string{"name", "description", "type", "default_behavior"} {
@@ -303,16 +296,21 @@ func validateConfigurationSourceNodes(document *yaml.Node, metadataPath string) 
 			!isDefaultScalar(defaultNode) {
 			return fmt.Errorf("%s: default must be a string, boolean, integer, or float scalar", entrySource)
 		}
-		if declarativeType, exists := fields["declarative_type"]; exists {
-			if declarativeType.Kind != yaml.ScalarNode || declarativeType.Tag != "!!str" {
-				return fmt.Errorf("%s: declarative_type must be a string", entrySource)
+		if hasName {
+			typeNode, exists := fields["type"]
+			if !exists || typeNode.Kind != yaml.ScalarNode || typeNode.Tag != "!!str" {
+				return fmt.Errorf("%s: type must be present and a string", entrySource)
 			}
-			if !isSupportedDeclarativeType(declarativeType.Value) {
-				return fmt.Errorf("%s: unsupported declarative_type %q", entrySource, declarativeType.Value)
+			if !isSupportedConfigurationType(typeNode.Value) {
+				return fmt.Errorf("%s: unsupported type %q", entrySource, typeNode.Value)
 			}
 		}
-		if schema, exists := fields["declarative_schema"]; exists && schema.Kind != yaml.MappingNode {
-			return fmt.Errorf("%s: declarative_schema must be a mapping", entrySource)
+		if schema, exists := fields["schema"]; exists && schema.Kind != yaml.MappingNode {
+			return fmt.Errorf("%s: schema must be a mapping", entrySource)
+		} else if exists {
+			if err := validateSchemaNodes(schema, entrySource); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -321,18 +319,163 @@ func validateConfigurationSourceNodes(document *yaml.Node, metadataPath string) 
 func validateConfigurationValues(configurations []metadata.Configuration, metadataPath string) error {
 	for i, configuration := range configurations {
 		entrySource := fmt.Sprintf("invalid configurations[%d] in %s", i, metadataPath)
-		if configuration.DeclarativeSchema != nil &&
-			(configuration.DeclarativeType == nil || *configuration.DeclarativeType != "structured_list") {
-			return fmt.Errorf("%s: declarative_schema requires declarative_type structured_list", entrySource)
+		if configuration.Ref != nil && configuration.Name == "" {
+			continue
 		}
-		if configuration.DeclarativeType != nil && *configuration.DeclarativeType == "structured_list" && configuration.DeclarativeSchema == nil {
-			return fmt.Errorf("%s: structured_list requires declarative_schema", entrySource)
+		if !isSupportedConfigurationType(configuration.Type) {
+			return fmt.Errorf("%s: unsupported or missing type %q", entrySource, configuration.Type)
 		}
-		if configuration.DeclarativeSchema != nil && configuration.DeclarativeSchema.Type != "object" {
-			return fmt.Errorf("%s: declarative_schema type must be object", entrySource)
+		if configuration.Default != nil {
+			switch configuration.Type {
+			case "boolean":
+				if _, err := strconv.ParseBool(*configuration.Default); err != nil {
+					return fmt.Errorf("%s: default %q is not a valid boolean", entrySource, *configuration.Default)
+				}
+			case "int":
+				if _, err := strconv.ParseInt(*configuration.Default, 10, 64); err != nil {
+					return fmt.Errorf("%s: default %q is not a valid integer", entrySource, *configuration.Default)
+				}
+			}
+		}
+		if configuration.Schema != nil && configuration.Type != "structured_list" {
+			return fmt.Errorf("%s: schema requires type structured_list", entrySource)
+		}
+		if configuration.Type == "structured_list" && configuration.Schema == nil {
+			return fmt.Errorf("%s: structured_list requires schema", entrySource)
+		}
+		if configuration.Schema != nil && configuration.Schema.Type != "object" {
+			return fmt.Errorf("%s: schema type must be object", entrySource)
+		}
+		if configuration.Schema != nil {
+			if configuration.Schema.Properties == nil {
+				return fmt.Errorf("%s: schema properties must be present", entrySource)
+			}
+			seen := make(map[string]bool)
+			for _, key := range configuration.Schema.Required {
+				if seen[key] {
+					return fmt.Errorf("%s: schema required has duplicate key %q", entrySource, key)
+				}
+				seen[key] = true
+				if _, exists := configuration.Schema.Properties[key]; !exists {
+					return fmt.Errorf("%s: schema required key %q is not defined", entrySource, key)
+				}
+			}
+		}
+		if configuration.Default != nil && (configuration.Type == "map" || configuration.Type == "list" || configuration.Type == "structured_list") {
+			if err := validateCollectionDefault(configuration, entrySource); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
+}
+
+func validateCollectionDefault(configuration metadata.Configuration, source string) error {
+	var document yaml.Node
+	if err := yaml.Unmarshal([]byte(*configuration.Default), &document); err != nil {
+		return fmt.Errorf("%s: parse collection default: %w", source, err)
+	}
+	if len(document.Content) != 1 || !schemaValueMatches(document.Content[0], configuration.Type) {
+		return fmt.Errorf("%s: default must encode a YAML value of type %q", source, configuration.Type)
+	}
+	// Decode as well to catch duplicate keys inside the encoded default.
+	var decoded any
+	if err := document.Decode(&decoded); err != nil {
+		return fmt.Errorf("%s: invalid collection default: %w", source, err)
+	}
+	if configuration.Type != "structured_list" {
+		return nil
+	}
+	for i, item := range document.Content[0].Content {
+		fields := make(map[string]*yaml.Node, len(item.Content)/2)
+		for j := 0; j < len(item.Content); j += 2 {
+			fields[item.Content[j].Value] = item.Content[j+1]
+		}
+		for _, required := range configuration.Schema.Required {
+			if _, exists := fields[required]; !exists {
+				return fmt.Errorf("%s: default[%d] required schema property %q is missing", source, i, required)
+			}
+		}
+		for j := 0; j < len(item.Content); j += 2 {
+			key, value := item.Content[j].Value, item.Content[j+1]
+			property, exists := configuration.Schema.Properties[key]
+			if !exists || !schemaValueMatches(value, property.Type) {
+				return fmt.Errorf("%s: default[%d] schema property %q is unknown or has the wrong type", source, i, key)
+			}
+		}
+	}
+	return nil
+}
+
+// validateSchemaNodes preserves presence and native types for schema property
+// defaults and examples; decoding a missing and an explicit null both yield nil.
+func validateSchemaNodes(schema *yaml.Node, source string) error {
+	for i := 0; i < len(schema.Content); i += 2 {
+		if schema.Content[i].Value != "properties" {
+			continue
+		}
+		properties := schema.Content[i+1]
+		if properties.Kind != yaml.MappingNode {
+			return fmt.Errorf("%s: schema properties must be a mapping", source)
+		}
+		for j := 0; j < len(properties.Content); j += 2 {
+			key, property := properties.Content[j], properties.Content[j+1]
+			if key.Tag != "!!str" || key.Value == "" || property.Kind != yaml.MappingNode {
+				return fmt.Errorf("%s: schema properties require non-empty string keys and mapping values", source)
+			}
+			var typeNode *yaml.Node
+			for k := 0; k < len(property.Content); k += 2 {
+				if property.Content[k].Value == "type" {
+					typeNode = property.Content[k+1]
+				}
+			}
+			if typeNode == nil || typeNode.Tag != "!!str" || !isSupportedConfigurationType(typeNode.Value) {
+				return fmt.Errorf("%s: schema property %q requires a supported type", source, key.Value)
+			}
+			for k := 0; k < len(property.Content); k += 2 {
+				field, value := property.Content[k].Value, property.Content[k+1]
+				if (field == "default" || field == "example") && !schemaValueMatches(value, typeNode.Value) {
+					return fmt.Errorf("%s: schema property %q %s does not match type %q", source, key.Value, field, typeNode.Value)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func schemaValueMatches(node *yaml.Node, typeName string) bool {
+	switch typeName {
+	case "boolean":
+		return node.Kind == yaml.ScalarNode && node.Tag == "!!bool"
+	case "int":
+		return node.Kind == yaml.ScalarNode && node.Tag == "!!int"
+	case "string":
+		return node.Kind == yaml.ScalarNode && node.Tag == "!!str"
+	case "map":
+		if node.Kind != yaml.MappingNode {
+			return false
+		}
+		for i := 0; i < len(node.Content); i += 2 {
+			if node.Content[i].Tag != "!!str" {
+				return false
+			}
+		}
+		return true
+	case "list":
+		return node.Kind == yaml.SequenceNode
+	case "structured_list":
+		if node.Kind != yaml.SequenceNode {
+			return false
+		}
+		for _, item := range node.Content {
+			if !schemaValueMatches(item, "map") {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
 }
 
 func validateSelectorString(node *yaml.Node, field, source string) error {
@@ -391,7 +534,7 @@ func resolveConfigurationRefs(
 	return nil
 }
 
-func isSupportedDeclarativeType(value string) bool {
+func isSupportedConfigurationType(value string) bool {
 	switch value {
 	case "boolean", "string", "int", "map", "list", "structured_list":
 		return true

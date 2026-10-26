@@ -124,15 +124,15 @@ source:
   commit: 3b04ae78576ec407854d734eb4da4f78a67f902c
   file: schema/instrumentation.yaml
 definitions:
-  general.http.client.request_captured_headers/development:
-    declarative_name: general.http.client.request_captured_headers/development
+  general.http.client.request_captured_headers:
+    name: general.http.client.request_captured_headers
     description: Configure headers to capture for outbound HTTP requests.
-    declarative_type: list
+    type: list
     default_behavior: No outbound request headers are captured.
   go.test.option:
-    declarative_name: go.test.option
+    name: go.test.option
     description: Test-only Go-owned catalog entry.
-    declarative_type: boolean
+    type: boolean
 `
 	if err := os.WriteFile(path, []byte(catalog), filePerm); err != nil {
 		t.Fatal(err)
@@ -285,35 +285,29 @@ func TestScanMetadataRepoConfigurationEntryShape(t *testing.T) {
 		wantInline          bool
 		wantRef             bool
 		wantSchema          bool
-		wantLegacy          bool
-		wantDeclarativeName string
 		wantRefValue        string
-		wantDeclarativeType string
 		wantDescription     string
 		wantDefaultBehavior string
 	}{
 		{
 			name: "inline declarative configuration",
-			config: `- name: otel.instrumentation.http.enabled
-  declarative_name: go.net_http.enabled
+			config: `- name: go.net_http.enabled
   description: Enables HTTP instrumentation.
   type: boolean
   default: true`,
-			wantName:            "otel.instrumentation.http.enabled",
-			wantType:            "boolean",
-			wantDefault:         "true",
-			checkDefault:        true,
-			wantInline:          true,
-			wantDeclarativeName: "go.net_http.enabled",
+			wantName:     "go.net_http.enabled",
+			wantType:     "boolean",
+			wantDefault:  "true",
+			checkDefault: true,
+			wantInline:   true,
 		},
 		{
 			name: "structured declarative configuration",
-			config: `- declarative_name: go.http.client.rules
+			config: `- name: go.http.client.rules
   description: HTTP client rules.
-  type: list
-  default: ""
-  declarative_type: structured_list
-  declarative_schema:
+  type: structured_list
+  default: "[]"
+  schema:
     type: object
     required: [pattern]
     properties:
@@ -323,61 +317,96 @@ func TestScanMetadataRepoConfigurationEntryShape(t *testing.T) {
       enabled:
         type: boolean
         default: false`,
-			wantInline:          true,
-			wantSchema:          true,
-			wantDeclarativeName: "go.http.client.rules",
+			wantInline: true,
+			wantSchema: true,
+			wantName:   "go.http.client.rules",
+			wantType:   "structured_list",
 		},
 		{
 			name:                "shared reference resolves and preserves its ref",
-			config:              `- ref: general.http.client.request_captured_headers/development`,
+			config:              `- ref: general.http.client.request_captured_headers`,
 			wantRef:             true,
-			wantRefValue:        "general.http.client.request_captured_headers/development",
-			wantDeclarativeName: "general.http.client.request_captured_headers/development",
-			wantDeclarativeType: "list",
+			wantRefValue:        "general.http.client.request_captured_headers",
+			wantName:            "general.http.client.request_captured_headers",
+			wantType:            "list",
 			wantDescription:     "Configure headers to capture for outbound HTTP requests.",
 			wantDefaultBehavior: "No outbound request headers are captured.",
 		},
 		{
-			name:                "Go-owned reference resolves",
-			config:              `- ref: go.test.option`,
-			wantRef:             true,
-			wantRefValue:        "go.test.option",
-			wantDeclarativeName: "go.test.option",
-			wantDeclarativeType: "boolean",
-			wantDescription:     "Test-only Go-owned catalog entry.",
+			name:            "Go-owned reference resolves",
+			config:          `- ref: go.test.option`,
+			wantRef:         true,
+			wantRefValue:    "go.test.option",
+			wantName:        "go.test.option",
+			wantType:        "boolean",
+			wantDescription: "Test-only Go-owned catalog entry.",
 		},
 		{
 			name: "both selectors",
-			config: `- declarative_name: go.net_http.enabled
-  ref: general.http.client.request_captured_headers/development`,
-			wantError: "exactly one of declarative_name or ref",
+			config: `- name: go.net_http.enabled
+  ref: general.http.client.request_captured_headers`,
+			wantError: "exactly one of name or ref",
 		},
 		{
 			name: "shared reference with inline fields",
-			config: `- ref: general.http.client.request_captured_headers/development
+			config: `- ref: general.http.client.request_captured_headers
   type: list`,
 			wantError: `a ref entry must not include inline configuration field "type"`,
 		},
 		{
 			name: "shared reference with empty inline field",
-			config: `- ref: general.http.client.request_captured_headers/development
+			config: `- ref: general.http.client.request_captured_headers
   description: ""`,
 			wantError: `a ref entry must not include inline configuration field "description"`,
 		},
 		{
-			name: "legacy Go-only configuration without selectors",
-			config: `- name: otel.instrumentation.http.enabled
-  type: bool
-  default: "true"`,
-			wantName:     "otel.instrumentation.http.enabled",
-			wantType:     "bool",
-			wantDefault:  "true",
-			checkDefault: true,
-			wantLegacy:   true,
+			name:      "neither selector is rejected",
+			config:    `- description: missing selector`,
+			wantError: "exactly one of name or ref",
+		},
+		{
+			name: "null name is rejected", config: "- name: null", wantError: "name must be a string",
+		},
+		{
+			name: "duplicate name is rejected", config: "- name: go.x\n  name: go.y\n  type: boolean", wantError: "duplicate field",
+		},
+		{
+			name: "old name field is rejected", config: "- name: go.x\n  type: string\n  declarative_name: go.x", wantError: "field declarative_name not found",
+		},
+		{
+			name: "old type field is rejected", config: "- name: go.x\n  type: string\n  declarative_type: string", wantError: "field declarative_type not found",
+		},
+		{
+			name: "old schema field is rejected", config: "- name: go.x\n  type: string\n  declarative_schema: {}", wantError: "field declarative_schema not found",
+		},
+		{
+			name: "null ref override is rejected", config: "- ref: go.test.option\n  description: null", wantError: "must not include inline configuration field",
+		},
+		{
+			name: "invalid boolean default", config: "- name: go.x\n  type: boolean\n  default: yes", wantError: "not a valid boolean",
+		},
+		{
+			name: "invalid list default", config: "- name: go.x\n  type: list\n  default: nope", wantError: "default must encode",
+		},
+		{
+			name: "invalid map default", config: "- name: go.x\n  type: map\n  default: \"[]\"", wantError: "default must encode",
+		},
+		{
+			name: "missing required default property", config: "- name: go.x\n  type: structured_list\n  default: \"[{}]\"\n  schema: {type: object, required: [enabled], properties: {enabled: {type: boolean}}}", wantError: "required schema property",
+		},
+		{
+			name: "wrong typed default property", config: "- name: go.x\n  type: structured_list\n  default: \"[{enabled: nope}]\"\n  schema: {type: object, properties: {enabled: {type: boolean}}}", wantError: "schema property",
+		},
+		{
+			name: "invalid schema property default", config: "- name: go.x\n  type: structured_list\n  schema: {type: object, properties: {enabled: {type: boolean, default: \"false\"}}}", wantError: "default does not match type",
+		},
+		{
+			name: "invalid schema property example", config: "- name: go.x\n  type: structured_list\n  schema: {type: object, properties: {enabled: {type: boolean, example: null}}}", wantError: "example does not match type",
 		},
 		{
 			name: "non-scalar top-level default is rejected",
-			config: `- declarative_name: go.net_http.enabled
+			config: `- name: go.net_http.enabled
+  type: boolean
   default: [true]`,
 			wantError: "default must be a string, boolean, integer, or float scalar",
 		},
@@ -387,9 +416,9 @@ func TestScanMetadataRepoConfigurationEntryShape(t *testing.T) {
 			wantError: "ref must be a string",
 		},
 		{
-			name:      "empty declarative name",
-			config:    `- declarative_name: ""`,
-			wantError: "declarative_name must not be empty",
+			name:      "empty name",
+			config:    `- name: ""`,
+			wantError: "name must not be empty",
 		},
 		{
 			name:      "empty ref",
@@ -397,49 +426,49 @@ func TestScanMetadataRepoConfigurationEntryShape(t *testing.T) {
 			wantError: "ref must not be empty",
 		},
 		{
-			name:      "declarative fields require a selector",
-			config:    `- declarative_type: boolean`,
-			wantError: "declarative_type, declarative_schema, or default_behavior requires declarative_name or ref",
+			name:      "missing type",
+			config:    `- name: go.test`,
+			wantError: "type must be present and a string",
 		},
 		{
-			name:      "declarative name with surrounding whitespace",
-			config:    `- declarative_name: " go.net_http.enabled "`,
-			wantError: "declarative_name must not have leading or trailing whitespace",
+			name:      "name with surrounding whitespace",
+			config:    `- name: " go.net_http.enabled "`,
+			wantError: "name must not have leading or trailing whitespace",
 		},
 		{
 			name:      "ref with surrounding whitespace",
-			config:    `- ref: " general.http.client.request_captured_headers/development "`,
+			config:    `- ref: " general.http.client.request_captured_headers "`,
 			wantError: "ref must not have leading or trailing whitespace",
 		},
 		{
-			name: "unknown declarative type",
-			config: `- declarative_name: go.net_http.enabled
-  declarative_type: str`,
-			wantError: "unsupported declarative_type \"str\"",
+			name: "unknown type",
+			config: `- name: go.net_http.enabled
+  type: str`,
+			wantError: "unsupported type \"str\"",
 		},
 		{
 			name: "schema on scalar declarative type",
-			config: `- declarative_name: go.net_http.enabled
-  declarative_type: boolean
-  declarative_schema:
+			config: `- name: go.net_http.enabled
+  type: boolean
+  schema:
     type: object
     properties: {}`,
-			wantError: "declarative_schema requires declarative_type structured_list",
+			wantError: "schema requires type structured_list",
 		},
 		{
 			name: "structured list requires schema",
-			config: `- declarative_name: go.http.client.rules
-  declarative_type: structured_list`,
-			wantError: "structured_list requires declarative_schema",
+			config: `- name: go.http.client.rules
+  type: structured_list`,
+			wantError: "structured_list requires schema",
 		},
 		{
 			name: "schema must describe an object",
-			config: `- declarative_name: go.http.client.rules
-  declarative_type: structured_list
-  declarative_schema:
+			config: `- name: go.http.client.rules
+  type: structured_list
+  schema:
     type: string
     properties: {}`,
-			wantError: "declarative_schema type must be object",
+			wantError: "schema type must be object",
 		},
 	}
 
@@ -468,12 +497,8 @@ func TestScanMetadataRepoConfigurationEntryShape(t *testing.T) {
 				t.Fatalf("configurations = %d, want 1", len(configurations))
 			}
 			configuration := configurations[0]
-			if tt.wantDeclarativeName == "" {
-				if configuration.DeclarativeName != nil {
-					t.Errorf("declarative_name = %q, want absent", *configuration.DeclarativeName)
-				}
-			} else if configuration.DeclarativeName == nil || *configuration.DeclarativeName != tt.wantDeclarativeName {
-				t.Errorf("declarative_name = %v, want %q", configuration.DeclarativeName, tt.wantDeclarativeName)
+			if configuration.Name != tt.wantName {
+				t.Errorf("name = %q, want %q", configuration.Name, tt.wantName)
 			}
 			if got := configuration.Ref != nil; got != tt.wantRef {
 				t.Errorf("ref present = %v, want %v", got, tt.wantRef)
@@ -481,8 +506,8 @@ func TestScanMetadataRepoConfigurationEntryShape(t *testing.T) {
 			if tt.wantRefValue != "" && (configuration.Ref == nil || *configuration.Ref != tt.wantRefValue) {
 				t.Errorf("ref = %v, want %q", configuration.Ref, tt.wantRefValue)
 			}
-			if tt.wantDeclarativeType != "" && (configuration.DeclarativeType == nil || *configuration.DeclarativeType != tt.wantDeclarativeType) {
-				t.Errorf("declarative_type = %v, want %q", configuration.DeclarativeType, tt.wantDeclarativeType)
+			if configuration.Type != tt.wantType {
+				t.Errorf("type = %q, want %q", configuration.Type, tt.wantType)
 			}
 			if tt.wantDescription != "" && configuration.Description != tt.wantDescription {
 				t.Errorf("description = %q, want %q", configuration.Description, tt.wantDescription)
@@ -490,21 +515,15 @@ func TestScanMetadataRepoConfigurationEntryShape(t *testing.T) {
 			if configuration.DefaultBehavior != tt.wantDefaultBehavior {
 				t.Errorf("default_behavior = %q, want %q", configuration.DefaultBehavior, tt.wantDefaultBehavior)
 			}
-			if tt.wantInline || tt.wantLegacy {
-				if configuration.Name != tt.wantName {
-					t.Errorf("name = %q, want %q", configuration.Name, tt.wantName)
-				}
-				if tt.wantType != "" && configuration.Type != tt.wantType {
-					t.Errorf("type = %q, want %q", configuration.Type, tt.wantType)
-				}
+			if tt.wantInline {
 				if tt.checkDefault && (configuration.Default == nil || *configuration.Default != tt.wantDefault) {
 					t.Errorf("default = %v, want string %q", configuration.Default, tt.wantDefault)
 				}
 				if tt.wantSchema {
-					if configuration.DeclarativeSchema == nil {
-						t.Fatal("declarative_schema = nil, want schema")
+					if configuration.Schema == nil {
+						t.Fatal("schema = nil, want schema")
 					}
-					if got := configuration.DeclarativeSchema.Properties["enabled"].Default; got != false {
+					if got := configuration.Schema.Properties["enabled"].Default; got != false {
 						t.Errorf("schema property default = %#v, want false bool", got)
 					}
 				}
@@ -547,12 +566,25 @@ func TestScanMetadataRepoConfigurationRefRequiresCatalog(t *testing.T) {
 	writeGoMod(t, root, "instrumentation/dummy", "module go.opentelemetry.io/otelc/dummy\n\ngo 1.25.0\n")
 	writeMetadata(t, root, "instrumentation/dummy", `name: test-lib
 configurations:
-  - ref: general.http.client.request_captured_headers/development
+  - ref: general.http.client.request_captured_headers
 `)
 
 	_, err := ScanMetadataRepo(root)
 	if err == nil || !strings.Contains(err.Error(), configurationCatalogPath) {
 		t.Fatalf("ScanMetadataRepo() error = %v, want catalog-path diagnostic", err)
+	}
+}
+
+func TestScanMetadataRepoInlineConfigurationWithoutCatalog(t *testing.T) {
+	root := t.TempDir()
+	writeGoMod(t, root, "instrumentation/dummy", "module example.com/hooks\n\ngo 1.26.0\n")
+	writeMetadata(t, root, "instrumentation/dummy", "name: test-lib\nconfigurations:\n  - name: go.test.enabled\n    type: boolean\n    default: false\n")
+	result, err := ScanMetadataRepo(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Libraries) != 1 || len(result.Libraries[0].Configurations) != 1 || result.Libraries[0].Configurations[0].Name != "go.test.enabled" {
+		t.Fatalf("inline metadata must not require a catalog: %#v", result)
 	}
 }
 

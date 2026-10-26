@@ -2,6 +2,7 @@ package instrumentation
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -38,7 +39,40 @@ func readConfigurationCatalog(repoPath string) (map[string]metadata.Configuratio
 	if err != nil {
 		return nil, fmt.Errorf("read configuration catalog %s: %w", path, err)
 	}
+	return parseConfigurationCatalog(data, path)
+}
 
+func parseConfigurationCatalog(data []byte, path string) (map[string]metadata.Configuration, error) {
+	var document yaml.Node
+	if err := yaml.Unmarshal(data, &document); err != nil {
+		return nil, fmt.Errorf("parse configuration catalog %s: %w", path, err)
+	}
+	if len(document.Content) != 1 || document.Content[0].Kind != yaml.MappingNode {
+		return nil, fmt.Errorf("configuration catalog %s must be a mapping", path)
+	}
+	for i := 0; i < len(document.Content[0].Content); i += 2 {
+		if document.Content[0].Content[i].Value != "definitions" {
+			continue
+		}
+		definitions := document.Content[0].Content[i+1]
+		if definitions.Kind != yaml.MappingNode {
+			return nil, fmt.Errorf("configuration catalog %s definitions must be a mapping", path)
+		}
+		for j := 0; j < len(definitions.Content); j += 2 {
+			// Catalog definitions obey the same source-entry rules as inline
+			// metadata. Validate nodes before decoding to preserve field presence.
+			entry := definitions.Content[j+1]
+			entryDocument := &yaml.Node{Kind: yaml.DocumentNode, Content: []*yaml.Node{{
+				Kind: yaml.MappingNode, Content: []*yaml.Node{
+					{Kind: yaml.ScalarNode, Tag: "!!str", Value: "configurations"},
+					{Kind: yaml.SequenceNode, Content: []*yaml.Node{entry}},
+				},
+			}}}
+			if err := validateConfigurationSourceNodes(entryDocument, path+" ref "+definitions.Content[j].Value); err != nil {
+				return nil, err
+			}
+		}
+	}
 	decoder := yaml.NewDecoder(bytes.NewReader(data))
 	decoder.KnownFields(true)
 	var catalog configurationCatalog
@@ -46,7 +80,7 @@ func readConfigurationCatalog(repoPath string) (map[string]metadata.Configuratio
 		return nil, fmt.Errorf("parse configuration catalog %s: %w", path, err)
 	}
 	var extra any
-	if err := decoder.Decode(&extra); err != io.EOF {
+	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
 		if err == nil {
 			return nil, fmt.Errorf("configuration catalog %s must contain one YAML document", path)
 		}
@@ -73,11 +107,11 @@ func readConfigurationCatalog(repoPath string) (map[string]metadata.Configuratio
 	for _, ref := range refs {
 		definition := catalog.Definitions[ref]
 		source := fmt.Sprintf("configuration catalog %s ref %q", path, ref)
-		if ref == "" || definition.DeclarativeName == nil || *definition.DeclarativeName == "" {
-			return nil, fmt.Errorf("%s must have a non-empty declarative_name", source)
+		if ref == "" || definition.Name == "" {
+			return nil, fmt.Errorf("%s must have a non-empty name", source)
 		}
-		if *definition.DeclarativeName != ref {
-			return nil, fmt.Errorf("%s key must equal declarative_name %q", source, *definition.DeclarativeName)
+		if definition.Name != ref {
+			return nil, fmt.Errorf("%s key must equal name %q", source, definition.Name)
 		}
 		if !strings.HasPrefix(ref, "general.") && !strings.HasPrefix(ref, "go.") {
 			return nil, fmt.Errorf("%s must use the general. or go. namespace", source)
@@ -85,15 +119,8 @@ func readConfigurationCatalog(repoPath string) (map[string]metadata.Configuratio
 		if definition.Ref != nil {
 			return nil, fmt.Errorf("%s must define a path directly, not another ref", source)
 		}
-		if definition.DeclarativeType != nil && !isSupportedDeclarativeType(*definition.DeclarativeType) {
-			return nil, fmt.Errorf("%s has unsupported declarative_type %q", source, *definition.DeclarativeType)
-		}
-		if definition.DeclarativeSchema != nil &&
-			(definition.DeclarativeType == nil || *definition.DeclarativeType != "structured_list") {
-			return nil, fmt.Errorf("%s declarative_schema requires declarative_type structured_list", source)
-		}
-		if definition.DeclarativeType != nil && *definition.DeclarativeType == "structured_list" && definition.DeclarativeSchema == nil {
-			return nil, fmt.Errorf("%s structured_list requires declarative_schema", source)
+		if err := validateConfigurationValues([]metadata.Configuration{definition}, source); err != nil {
+			return nil, err
 		}
 		definitions[ref] = cloneConfiguration(definition)
 	}
@@ -103,10 +130,6 @@ func readConfigurationCatalog(repoPath string) (map[string]metadata.Configuratio
 func cloneConfiguration(configuration metadata.Configuration) metadata.Configuration {
 	clone := configuration
 	clone.Examples = slices.Clone(configuration.Examples)
-	if configuration.DeclarativeName != nil {
-		value := *configuration.DeclarativeName
-		clone.DeclarativeName = &value
-	}
 	if configuration.Ref != nil {
 		value := *configuration.Ref
 		clone.Ref = &value
@@ -115,18 +138,41 @@ func cloneConfiguration(configuration metadata.Configuration) metadata.Configura
 		value := *configuration.Default
 		clone.Default = &value
 	}
-	if configuration.DeclarativeType != nil {
-		value := *configuration.DeclarativeType
-		clone.DeclarativeType = &value
-	}
-	if configuration.DeclarativeSchema != nil {
-		schema := *configuration.DeclarativeSchema
-		schema.Required = slices.Clone(configuration.DeclarativeSchema.Required)
-		schema.Properties = make(map[string]metadata.DeclarativeProperty, len(configuration.DeclarativeSchema.Properties))
-		for key, property := range configuration.DeclarativeSchema.Properties {
+	if configuration.Schema != nil {
+		schema := *configuration.Schema
+		schema.Required = slices.Clone(configuration.Schema.Required)
+		schema.Properties = make(map[string]metadata.ConfigurationProperty, len(configuration.Schema.Properties))
+		for key, property := range configuration.Schema.Properties {
+			property.Default = cloneYAMLValue(property.Default)
+			property.Example = cloneYAMLValue(property.Example)
 			schema.Properties[key] = property
 		}
-		clone.DeclarativeSchema = &schema
+		clone.Schema = &schema
 	}
 	return clone
+}
+
+func cloneYAMLValue(value any) any {
+	switch value := value.(type) {
+	case []any:
+		result := make([]any, len(value))
+		for i, item := range value {
+			result[i] = cloneYAMLValue(item)
+		}
+		return result
+	case map[string]any:
+		result := make(map[string]any, len(value))
+		for key, item := range value {
+			result[key] = cloneYAMLValue(item)
+		}
+		return result
+	case map[any]any:
+		result := make(map[any]any, len(value))
+		for key, item := range value {
+			result[key] = cloneYAMLValue(item)
+		}
+		return result
+	default:
+		return value
+	}
 }
