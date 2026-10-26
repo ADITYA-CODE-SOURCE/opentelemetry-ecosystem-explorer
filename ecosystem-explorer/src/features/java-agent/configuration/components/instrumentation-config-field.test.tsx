@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vite-plus/test";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Configuration } from "@/types/javaagent";
@@ -391,6 +391,38 @@ describe("InstrumentationConfigField — map entries grow", () => {
     rerender(<InstrumentationConfigField config={cfg} onJumpToGeneral={vi.fn()} />);
     expect(screen.getAllByRole("button", { name: /remove entry/i })).toHaveLength(2);
     void stored;
+  });
+
+  it("renders nested object and array values as JSON and primitives as plain text", () => {
+    mockState = {
+      ...baseState,
+      values: {
+        "instrumentation/development": {
+          java: {
+            common: {
+              peer_service_mapping: {
+                obj: { a: 1, b: "x" },
+                arr: [1, "two", null],
+                str: "plain",
+                num: 42,
+                bool: true,
+                nil: null,
+              },
+            },
+          },
+        },
+      },
+    };
+    const cfg = makeAggregated({
+      declarative_name: "java.common.peer_service_mapping",
+      type: "map",
+      default: "",
+    });
+    render(<InstrumentationConfigField config={cfg} onJumpToGeneral={vi.fn()} />);
+    const values = [1, 2, 3, 4, 5, 6].map(
+      (i) => (screen.getByRole("textbox", { name: `Value ${i}` }) as HTMLInputElement).value
+    );
+    expect(values).toEqual(['{"a":1,"b":"x"}', '[1,"two",null]', "plain", "42", "true", "null"]);
   });
 });
 

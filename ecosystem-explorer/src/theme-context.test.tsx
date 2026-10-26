@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import { cleanup, render, renderHook, act } from "@testing-library/react";
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vite-plus/test";
 import { ThemeProvider, useTheme } from "@/theme-context";
 
 function mockMatchMedia(prefersDark: boolean) {

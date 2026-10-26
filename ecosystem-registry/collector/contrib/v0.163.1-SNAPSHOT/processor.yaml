@@ -2,7 +2,7 @@ distribution: contrib
 version: 0.163.1-SNAPSHOT
 repository: opentelemetry-collector-contrib
 component_type: processor
-schema_hash: 0faf6634f107
+schema_hash: a13cd490860c
 components:
 - name: adaptivetailsamplingprocessor
   metadata:
@@ -89,6 +89,21 @@ components:
             monotonic: true
             value_type: int
           unit: '{errors}'
+        processor_adaptive_tail_sampling_root_span_condition_multiple_matches:
+          description: Distribution of root span condition matches for traces where
+            the condition matched more than once.
+          enabled: true
+          histogram:
+            bucket_boundaries:
+            - 2
+            - 3
+            - 5
+            - 10
+            - 25
+            - 100
+            value_type: int
+          stability: development
+          unit: '{spans}'
         processor_adaptive_tail_sampling_sampler_burst_count:
           description: Cumulative number of intervals in which an adaptive sampler
             (adaptive_percentage or adaptive_throughput) detected a burst of traffic,
@@ -503,14 +518,6 @@ components:
     description: The Filter Processor allows dropping spans, span events, metrics,
       datapoints, and logs from the collector.
     display_name: Filter Processor
-    feature_gates:
-    - description: Changes the default error_mode of the filter processor from propagate
-        to ignore
-      from_version: v0.150.0
-      id: processor.filter.defaultErrorModeIgnore
-      reference_url: https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/47232
-      stage: stable
-      to_version: v0.159.0
     status:
       class: processor
       codeowners:
@@ -596,8 +603,9 @@ components:
       codeowners:
         active:
         - andrzej-stencel
-        - michalpristas
         - rogercoll
+        emeritus:
+        - michalpristas
       distributions:
       - contrib
       stability:
@@ -618,9 +626,9 @@ components:
       codeowners:
         active:
         - rnishtala-sumo
-        - amdprophet
         emeritus:
         - echlebek
+        - amdprophet
       distributions:
       - contrib
       - k8s
@@ -1117,7 +1125,7 @@ components:
           ref: service.md#service-version
         stability: stable
         type: string
-    sem_conv_version: 1.42.0
+    sem_conv_version: 1.43.0
     status:
       class: processor
       codeowners:
@@ -1745,6 +1753,13 @@ components:
     type: metrics_transform
 - name: partitioningprocessor
   metadata:
+    attributes:
+      error.type:
+        description: Why key evaluation failed.
+        enum:
+        - evaluation_failed
+        - invalid_value_type
+        type: string
     description: The `partitioning` processor splits incoming batches into sub-batches
       using OTTL value expressions, and forwards each sub-batch with the evaluated
       partition keys added to the outgoing request metadata.
@@ -1757,13 +1772,48 @@ components:
         - dmitryax
         emeritus:
         - axw
-      distributions: []
+      distributions:
+      - contrib
       stability:
-        development:
+        alpha:
         - logs
         - metrics
-        - profiles
         - traces
+        development:
+        - profiles
+    telemetry:
+      metrics:
+        processor.partitioning.key_evaluation.errors:
+          attributes:
+          - error.type
+          description: Number of batches rejected because a key expression failed
+            to evaluate or returned a non-string value.
+          enabled: true
+          prefix: otelcol.
+          stability: development
+          sum:
+            monotonic: true
+            value_type: int
+          unit: '{batch}'
+        processor.partitioning.partitions:
+          description: Number of partitions each incoming batch was split into.
+          enabled: true
+          histogram:
+            bucket_boundaries:
+            - 1
+            - 2
+            - 3
+            - 5
+            - 10
+            - 20
+            - 50
+            - 100
+            - 250
+            - 1000
+            value_type: int
+          prefix: otelcol.
+          stability: development
+          unit: '{partition}'
     type: partitioning
 - name: probabilisticsamplerprocessor
   metadata:
@@ -1795,10 +1845,22 @@ components:
             monotonic: true
             value_type: int
           unit: '1'
-        processor_probabilistic_sampler_count_traces_sampled:
-          description: Count of traces that were sampled or not
+        processor_probabilistic_sampler_count_spans_processed:
+          description: Count of spans that were sampled or not
           enabled: true
           stability: development
+          sum:
+            monotonic: true
+            value_type: int
+          unit: '1'
+        processor_probabilistic_sampler_count_traces_sampled:
+          deprecated:
+            note: Use processor_probabilistic_sampler_count_spans_processed_total
+              instead
+            since: 0.161.0
+          description: '[DEPRECATED] Count of spans that were sampled or not'
+          enabled: true
+          stability: deprecated
           sum:
             monotonic: true
             value_type: int
@@ -2758,3 +2820,17 @@ components:
         alpha:
         - logs
     type: unroll
+- name: verifyprocessor
+  metadata:
+    status:
+      class: processor
+      codeowners:
+        active:
+        - hilmarf
+        - jmacd
+      distributions: []
+      stability:
+        development:
+        - logs
+      warnings: []
+    type: verify

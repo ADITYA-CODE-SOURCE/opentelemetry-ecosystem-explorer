@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import { renderHook, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { useActivityFeed } from "./use-activity-feed";
 
 const SAMPLE_FEED = {

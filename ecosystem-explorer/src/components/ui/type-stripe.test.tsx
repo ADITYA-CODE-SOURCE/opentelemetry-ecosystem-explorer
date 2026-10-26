@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import { render } from "@testing-library/react";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 import { type CollectorComponentType, TYPE_STRIPE_COLORS } from "./type-stripe-colors";
 import { TypeStripe } from "./type-stripe";
 

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import { render, screen } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vite-plus/test";
 import { TelemetryComparisonSection } from "./telemetry-comparison-section";
 import { useTelemetryComparison } from "../../hooks/use-telemetry-comparison";
 import type { UseTelemetryComparisonResult } from "../../hooks/use-telemetry-comparison";

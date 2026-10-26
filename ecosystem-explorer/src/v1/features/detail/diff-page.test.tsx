@@ -16,7 +16,7 @@
 
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { CollectorDiffPageV1 } from "./diff-page";
 import { useCollectorComponent, useComponentVersions } from "@/hooks/use-collector-data";

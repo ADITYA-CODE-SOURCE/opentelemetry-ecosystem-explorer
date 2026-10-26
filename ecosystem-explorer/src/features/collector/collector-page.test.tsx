@@ -15,7 +15,7 @@
  */
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi } from "vite-plus/test";
 import { CollectorPage } from "@/features/collector/collector-page.tsx";
 
 vi.mock("@/features/collector/components/collector-explore-landing.tsx", () => ({

@@ -18,7 +18,7 @@ import { resolve } from "node:path";
 import tailwind from "@tailwindcss/postcss";
 import postcss, { type AcceptedPlugin, type Root, type Rule } from "postcss";
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vite-plus/test";
 import { GlowBadge } from "@/components/ui/glow-badge";
 import { StatusPill } from "@/components/ui/status-pill";
 import { ThemeProvider } from "@/theme-context";

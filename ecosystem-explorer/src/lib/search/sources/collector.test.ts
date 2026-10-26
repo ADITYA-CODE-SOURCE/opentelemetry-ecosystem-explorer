@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 
 import { loadIndex, loadVersions } from "@/lib/api/collector-data";
 import type { IndexComponent } from "@/types/collector";

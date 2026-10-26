@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { diffSchemas, type SchemaKey } from "./schema-diff";
 
 const KEEP: SchemaKey = { key: "endpoint", type: "string", description: "Where to listen." };

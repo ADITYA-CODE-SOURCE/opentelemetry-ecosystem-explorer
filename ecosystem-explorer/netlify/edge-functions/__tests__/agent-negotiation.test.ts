@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vite-plus/test";
 import handler from "../agent-negotiation";
 
 type Rewrite = (path: string) => Promise<Response>;
@@ -90,7 +90,7 @@ function headContextWithMd(
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: URL | RequestInfo, init?: RequestInit) => {
-      expect(String(input)).toBe("https://explorer.opentelemetry.io/seo/routes.json");
+      expect(new Request(input).url).toBe("https://explorer.opentelemetry.io/seo/routes.json");
       expect(init?.method).toBe("GET");
       return new Response(JSON.stringify(routes), { status: 200 });
     })

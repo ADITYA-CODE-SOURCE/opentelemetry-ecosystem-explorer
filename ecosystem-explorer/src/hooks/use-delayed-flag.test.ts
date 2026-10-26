@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import { act, renderHook } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { useDelayedFlag } from "./use-delayed-flag";
 
 describe("useDelayedFlag", () => {

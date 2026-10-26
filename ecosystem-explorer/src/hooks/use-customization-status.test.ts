@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vite-plus/test";
 import { renderHook } from "@testing-library/react";
 import type { InstrumentationModule } from "@/types/javaagent";
 import { useConfigurationBuilder } from "./use-configuration-builder";

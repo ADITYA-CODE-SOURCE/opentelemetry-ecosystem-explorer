@@ -16,7 +16,7 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
-import { beforeEach, describe, it, expect, vi } from "vitest";
+import { beforeEach, describe, it, expect, vi } from "vite-plus/test";
 import { V1App } from "@/v1/V1App";
 import { ThemeProvider } from "@/theme-context";
 import {

@@ -17,7 +17,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vite-plus/test";
 import { TIMELINE_EVENT_TYPES, type TimelineData } from "../types";
 import { assertValidHistory, revisionKey, validateHistory } from "./accepted-history";
 
@@ -255,7 +255,7 @@ describe("validateHistory references", () => {
         "utf8"
       )
     );
-    expect([...schema.properties.events.items.properties.type.enum].sort()).toEqual(
+    expect([...(schema.properties.events.items.properties.type.enum as string[])].sort()).toEqual(
       [...TIMELINE_EVENT_TYPES].sort()
     );
   });

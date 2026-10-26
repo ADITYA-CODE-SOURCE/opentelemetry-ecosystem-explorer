@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { CollectorComponent } from "@/types/collector";
 import { collectorReleaseContext } from "@/v1/lib/collector-release";
 

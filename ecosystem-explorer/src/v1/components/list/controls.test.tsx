@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { DEFAULT_FILTERS, type ListFilters } from "@/v1/lib/list-filters";
 import {
   ActiveFilterChips,

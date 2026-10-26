@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import { renderHook, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { useEcosystemStats } from "./use-ecosystem-stats";
 
 const SAMPLE_JAVA_AGENT_STATS = { version_count: 5, library_count: 263 };

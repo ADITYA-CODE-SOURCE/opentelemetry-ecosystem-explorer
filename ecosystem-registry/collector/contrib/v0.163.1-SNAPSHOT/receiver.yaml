@@ -2,7 +2,7 @@ distribution: contrib
 version: 0.163.1-SNAPSHOT
 repository: opentelemetry-collector-contrib
 component_type: receiver
-schema_hash: 0faf6634f107
+schema_hash: a13cd490860c
 components:
 - name: activedirectorydsreceiver
   metadata:
@@ -7952,6 +7952,17 @@ components:
     description: The Kubernetes Objects Receiver collects (pull/watch) objects from
       the Kubernetes API server.
     display_name: Kubernetes Objects Receiver
+    feature_gates:
+    - description: 'When enabled, the receiver collects objects via a shared informer
+        factory (List+Watch backed by an in-memory cache) instead of the legacy per-object
+        pull/watch observers. Pull mode reads from the informer cache; watch mode
+        uses informer event handlers with automatic relist/reconnect. The `pull` RBAC
+        now also requires the `watch` verb, `resource_version` is ignored, and `exclude_watch_type:
+        [BOOKMARK, ERROR]` is a no-op.'
+      from_version: v0.164.0
+      id: receiver.k8sobjects.useInformerObserver
+      reference_url: https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/43602
+      stage: alpha
     status:
       class: receiver
       codeowners:
@@ -8603,7 +8614,9 @@ components:
         description: Total cumulative CPU time (sum of all cores) spent by the container/pod/node
           since its creation
         enabled: true
-        stability: development
+        semantic_convention:
+          ref: system/container-metrics.md#metric-containercputime
+        stability: beta
         sum:
           aggregation_temporality: cumulative
           monotonic: true
@@ -9295,6 +9308,7 @@ components:
         type: string
         warnings:
           if_enabled: This resource_attribute is deprecated and will be removed soon
+    sem_conv_version: 1.43.0
     status:
       class: receiver
       codeowners:
@@ -16581,13 +16595,6 @@ components:
       id: receiver.prometheusreceiver.EnableCreatedTimestampZeroIngestion
       reference_url: https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/40355
       stage: alpha
-    - description: When enabled, the `otel_scope_info` metric is ignored for scope
-        attribute extraction.
-      from_version: v0.148.0
-      id: receiver.prometheusreceiver.IgnoreScopeInfoMetric
-      reference_url: https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/41502
-      stage: stable
-      to_version: v0.164.0
     status:
       class: receiver
       codeowners:
@@ -16622,6 +16629,17 @@ components:
       stability:
         alpha:
         - metrics
+    telemetry:
+      metrics:
+        receiver_prometheusremotewrite_resource_cache_evictions:
+          description: Number of job/instance entries evicted from the resource metrics
+            cache because it was full.
+          enabled: true
+          stability: development
+          sum:
+            monotonic: true
+            value_type: int
+          unit: '{entries}'
     type: prometheus_remote_write
 - name: pulsarreceiver
   metadata:
@@ -16655,10 +16673,10 @@ components:
       class: receiver
       codeowners:
         active:
-        - dgoscn
         - chrroberts-pure
         emeritus:
         - jpkrohling
+        - dgoscn
       distributions:
       - contrib
       stability:
@@ -16674,10 +16692,10 @@ components:
       class: receiver
       codeowners:
         active:
-        - dgoscn
         - chrroberts-pure
         emeritus:
         - jpkrohling
+        - dgoscn
       distributions:
       - contrib
       stability:
@@ -18473,13 +18491,13 @@ components:
     status:
       class: receiver
       codeowners:
-        active:
+        emeritus:
         - armstrmi
         seeking_new: true
       distributions:
       - contrib
       stability:
-        beta:
+        unmaintained:
         - metrics
     type: riak
 - name: saphanareceiver

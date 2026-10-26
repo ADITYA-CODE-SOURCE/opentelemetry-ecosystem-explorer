@@ -2,7 +2,7 @@ distribution: contrib
 version: 0.163.1-SNAPSHOT
 repository: opentelemetry-collector-contrib
 component_type: exporter
-schema_hash: 0faf6634f107
+schema_hash: a13cd490860c
 components:
 - name: alertmanagerexporter
   metadata:
@@ -129,8 +129,9 @@ components:
       codeowners:
         active:
         - atoulme
-        - pdelewski
         - Erog38
+        emeritus:
+        - pdelewski
       distributions:
       - contrib
       stability:
@@ -143,6 +144,36 @@ components:
   metadata:
     display_name: AWS X-Ray Tracing Exporter
     feature_gates:
+    - description: When enabled, the AWS X-Ray exporter no longer reads deprecated
+        semconv v1.12.0 database attribute keys. Requires exporter.awsxray.EmitV1DBConventions
+        to also be enabled.
+      from_version: v0.147.0
+      id: exporter.awsxray.DontEmitV0DBConventions
+      reference_url: https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/46533
+      stage: alpha
+    - description: When enabled, the AWS X-Ray exporter no longer reads deprecated
+        semconv v1.12.0 HTTP and network attribute keys. Requires exporter.awsxray.EmitV1HTTPNetworkConventions
+        to also be enabled.
+      from_version: v0.147.0
+      id: exporter.awsxray.DontEmitV0HTTPNetworkConventions
+      reference_url: https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/46533
+      stage: alpha
+    - description: When enabled, the AWS X-Ray exporter reads database span attributes
+        using semconv v1.38.0 keys (db.namespace, db.system.name, db.query.text, user.name)
+        instead of the deprecated v1.12.0 keys (db.name, db.system, db.statement,
+        db.user).
+      from_version: v0.147.0
+      id: exporter.awsxray.EmitV1DBConventions
+      reference_url: https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/46533
+      stage: alpha
+    - description: When enabled, the AWS X-Ray exporter reads HTTP and network span
+        attributes using semconv v1.38.0 keys (e.g. http.request.method, server.address,
+        server.port, client.address, messaging.message.body.size) instead of the deprecated
+        v1.12.0 keys.
+      from_version: v0.163.0
+      id: exporter.awsxray.EmitV1HTTPNetworkConventions
+      reference_url: https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/46533
+      stage: alpha
     - description: Remove XRay's timestamp validation on first 32 bits of trace ID
       from_version: v0.84.0
       id: exporter.awsxray.skiptimestampvalidation
@@ -194,14 +225,13 @@ components:
     status:
       class: exporter
       codeowners:
-        active:
-        - ag-ramachandran
         emeritus:
         - asaharn
+        - ag-ramachandran
       distributions:
       - contrib
       stability:
-        beta:
+        unmaintained:
         - logs
         - metrics
         - traces
@@ -369,10 +399,10 @@ components:
       codeowners:
         active:
         - atoulme
-        - martin-majlis-s1
         emeritus:
         - zdaratom-s1
         - tomaz-s1
+        - martin-majlis-s1
       distributions:
       - contrib
       stability:
@@ -404,6 +434,12 @@ components:
 - name: elasticsearchexporter
   metadata:
     attributes:
+      db.collection.name:
+        description: The index or data stream documents were written to, as reported
+          in the bulk response `_index`, with backing and failure store indices folded
+          into their data stream name. Only set when `telemetry::include_destination_index`
+          is enabled.
+        type: string
       error.type:
         description: The type of error that occurred when processing the documents.
         type: string
@@ -514,6 +550,7 @@ components:
           unit: s
         elasticsearch.docs.processed:
           attributes:
+          - db.collection.name
           - error.type
           - failure_store
           - http.response.status_code
@@ -1157,15 +1194,14 @@ components:
     status:
       class: exporter
       codeowners:
-        active:
-        - bogdandrutu
         emeritus:
         - khyatigandhi6
         - avadhut123pisal
+        - bogdandrutu
       distributions:
       - contrib
       stability:
-        alpha:
+        unmaintained:
         - logs
         - traces
     type: logicmonitor
@@ -1761,9 +1797,10 @@ components:
       class: exporter
       codeowners:
         active:
-        - kasia-kujawa
         - rnishtala-sumo
         - andrzej-stencel
+        emeritus:
+        - kasia-kujawa
       distributions:
       - contrib
       stability:

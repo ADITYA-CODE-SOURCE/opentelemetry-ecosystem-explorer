@@ -16,7 +16,7 @@
 
 import { StrictMode } from "react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { SemanticConventionTimeline } from "./semantic-convention-timeline";
 import type { TimelineData } from "../types";
 

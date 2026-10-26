@@ -15,7 +15,7 @@
  */
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vite-plus/test";
 import { ThemeProvider } from "@/theme-context";
 import { ThemeToggle } from "./theme-toggle";
 

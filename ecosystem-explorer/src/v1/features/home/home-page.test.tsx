@@ -16,7 +16,7 @@
 import { render, screen } from "@testing-library/react";
 import i18n from "i18next";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { HomeV1 } from "./home-page";
 
 function renderHome() {

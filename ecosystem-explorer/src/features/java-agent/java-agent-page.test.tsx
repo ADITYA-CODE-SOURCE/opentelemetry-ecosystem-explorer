@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import { render, screen } from "@testing-library/react";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 import { BrowserRouter } from "react-router-dom";
 import { JavaAgentPage } from "@/features/java-agent/java-agent-page.tsx";
 

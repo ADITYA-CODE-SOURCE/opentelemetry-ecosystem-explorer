@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vite-plus/test";
 import "fake-indexeddb/auto";
 import * as configData from "./configuration-data";
 import { loadConfigStarter } from "./configuration-data";

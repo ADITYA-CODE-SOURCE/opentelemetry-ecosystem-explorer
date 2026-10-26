@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import { render, screen } from "@testing-library/react";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi } from "vite-plus/test";
 import { ErrorBoundary } from "./error-boundary";
 
 function ThrowingComponent({ shouldThrow }: { shouldThrow: boolean }) {

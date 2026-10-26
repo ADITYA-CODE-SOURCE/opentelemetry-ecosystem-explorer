@@ -15,7 +15,7 @@
  */
 
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { TimelineData } from "@/features/semantic-conventions/types";
 import { revisionKey } from "@/features/semantic-conventions/history/accepted-history";
 import { EVENT_TYPES } from "@/features/semantic-conventions/utils/timeline-colors";

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 import type { ConfigNode } from "@/types/configuration";
 import type { ConfigurationBuilderState } from "@/types/configuration-builder";
 import { generateYaml, generateYamlSections } from "./yaml-generator";

@@ -16,7 +16,7 @@
 
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 
 import { QuickEntryRow, type QuickEntryItem } from "./quick-entry-row";
 
@@ -63,5 +63,15 @@ describe("QuickEntryRow", () => {
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", expect.stringContaining("noopener"));
     expect(link).toHaveAttribute("rel", expect.stringContaining("noreferrer"));
+  });
+
+  it("tells screen readers that only the external item opens in a new tab", () => {
+    renderRow();
+    expect(screen.getByRole("link", { name: /Core vs\. Contrib/i })).toHaveAccessibleName(
+      /\(opens in a new tab\)$/
+    );
+    expect(screen.getByRole("link", { name: /Most-used components/i })).not.toHaveAccessibleName(
+      /opens in a new tab/
+    );
   });
 });

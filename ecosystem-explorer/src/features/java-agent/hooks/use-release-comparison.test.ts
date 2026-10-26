@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import { renderHook, waitFor } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vite-plus/test";
 import { useReleaseComparison } from "./use-release-comparison";
 import * as javaagentData from "@/lib/api/javaagent-data";
 import { compareReleases } from "../utils/release-diff";

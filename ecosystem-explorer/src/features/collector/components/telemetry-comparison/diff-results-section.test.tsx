@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import { render, screen } from "@testing-library/react";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 import { DiffResultsSection } from "./diff-results-section";
 import type { CollectorTelemetryDiffResult } from "@/types/collector";
 
