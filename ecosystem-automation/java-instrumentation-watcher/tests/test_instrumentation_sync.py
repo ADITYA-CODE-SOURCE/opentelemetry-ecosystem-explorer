@@ -90,70 +90,21 @@ instrumentations:
         assert result is None
         mock_client.fetch_instrumentation_list.assert_not_called()
 
-    def test_update_snapshot(self, sync, mock_client):
-        mock_client.get_latest_release_tag.return_value = "v2.10.0"
-        mock_client.resolve_ref_to_sha.return_value = "sha123"
-        mock_client.fetch_instrumentation_list.return_value = """
-instrumentations:
-  - id: snapshot-test
-    name: Snapshot Test
-"""
-
-        snapshot_version = sync.update_snapshot()
-
-        assert snapshot_version == Version("2.10.1-SNAPSHOT")
-        mock_client.resolve_ref_to_sha.assert_any_call("main")
-        mock_client.fetch_instrumentation_list.assert_called_once_with(ref="sha123")
-
-        # Verify saved to inventory
-        assert sync.inventory_manager.version_exists(Version("2.10.1-SNAPSHOT"))
-
-    def test_update_snapshot_cleans_old_snapshots(self, sync, mock_client, inventory_manager):
-        old_snapshot = Version("2.9.0-SNAPSHOT")
-        inventory_manager.save_versioned_inventory(
-            version=old_snapshot,
-            instrumentations={"file_format": 0.1, "libraries": {}},
-        )
-
-        mock_client.get_latest_release_tag.return_value = "v2.10.0"
-        mock_client.resolve_ref_to_sha.return_value = "sha123"
-        mock_client.fetch_instrumentation_list.return_value = """
-instrumentations:
-  - id: test
-"""
-
-        snapshot_version = sync.update_snapshot()
-
-        # Old snapshot should be removed
-        assert not inventory_manager.version_exists(old_snapshot)
-        # New snapshot should exist
-        assert inventory_manager.version_exists(snapshot_version)
-
     def test_sync_full_workflow(self, sync, mock_client):
         mock_client.get_latest_release_tag.return_value = "v2.10.0"
         mock_client.resolve_ref_to_sha.return_value = "sha123"
-        mock_client.fetch_instrumentation_list.side_effect = [
-            """
+        mock_client.fetch_instrumentation_list.return_value = """
 instrumentations:
   - id: release-test
     name: Release Test
-""",
-            # Second call for snapshot
-            """
-instrumentations:
-  - id: snapshot-test
-    name: Snapshot Test
-""",
-        ]
+"""
 
         summary = sync.sync()
 
         assert summary["new_release"] == "2.10.0"
-        assert summary["snapshot_updated"] == "2.10.1-SNAPSHOT"
 
-        # Verify both versions saved
+        # Verify version saved
         assert sync.inventory_manager.version_exists(Version("2.10.0"))
-        assert sync.inventory_manager.version_exists(Version("2.10.1-SNAPSHOT"))
 
     def test_sync_no_new_release(self, sync, mock_client, inventory_manager):
         inventory_manager.save_versioned_inventory(
@@ -165,17 +116,12 @@ instrumentations:
 
         mock_client.get_latest_release_tag.return_value = "v2.10.0"
         mock_client.resolve_ref_to_sha.return_value = "sha123"
-        mock_client.fetch_instrumentation_list.return_value = """
-instrumentations:
-  - id: snapshot-test
-"""
 
         summary = sync.sync()
 
         # Should indicate no new release
         assert summary["new_release"] is None
-        # But snapshot should still be updated
-        assert summary["snapshot_updated"] == "2.10.1-SNAPSHOT"
+        mock_client.fetch_instrumentation_list.assert_not_called()
 
     def test_version_with_v_prefix_handling(self, sync, mock_client):
         mock_client.get_latest_release_tag.return_value = "v2.10.0"
@@ -189,28 +135,6 @@ instrumentations:
         # Version should not have 'v' prefix
         assert str(version) == "2.10.0"
         assert version == Version("2.10.0")
-
-    def test_update_snapshot_with_yaml_error(self, sync, mock_client):
-        mock_client.get_latest_release_tag.return_value = "v2.10.0"
-        mock_client.fetch_instrumentation_list.return_value = "malformed: [yaml"
-
-        with pytest.raises(ValueError, match="Error parsing instrumentation YAML"):
-            sync.update_snapshot()
-
-    def test_update_snapshot_parse_failure_preserves_existing_snapshot(self, sync, mock_client, inventory_manager):
-        existing = Version("2.9.1-SNAPSHOT")
-        inventory_manager.save_versioned_inventory(
-            version=existing,
-            instrumentations={"file_format": 0.1, "libraries": []},
-        )
-
-        mock_client.get_latest_release_tag.return_value = "v2.10.0"
-        mock_client.fetch_instrumentation_list.return_value = "malformed: [yaml"
-
-        with pytest.raises(ValueError):
-            sync.update_snapshot()
-
-        assert inventory_manager.version_exists(existing)
 
     def test_parse_cleans_whitespace(self, sync, mock_client):
         mock_client.get_latest_release_tag.return_value = "v2.10.0"
@@ -269,24 +193,6 @@ libraries:
         assert len(list(readme_dir.glob("*.md"))) == 2
         # Called twice: _sync_library_readmes and _sync_jmx_models
         assert mock_client.resolve_ref_to_sha.call_count == 2
-
-    def test_snapshot_sync_writes_readmes(self, mock_client, inventory_manager, mock_jmx_model_extractor):
-        mock_client.get_latest_release_tag.return_value = "v2.10.0"
-        mock_client.fetch_instrumentation_list.return_value = self._YAML_WITH_LIBRARIES
-        mock_client.resolve_ref_to_sha.return_value = "sha123"
-        mock_client.fetch_tree.return_value = self._TREE
-        mock_client.fetch_raw_file.return_value = "# README"
-
-        sync = InstrumentationSync(mock_client, inventory_manager, jmx_model_extractor=mock_jmx_model_extractor)
-        snapshot_version = sync.update_snapshot()
-
-        readme_dir = inventory_manager.inventory_dir / "library_readmes"
-        assert readme_dir.exists()
-        # Called twice: once in update_snapshot, once in _sync_library_readmes
-        assert mock_client.resolve_ref_to_sha.call_count == 2
-        mock_client.fetch_instrumentation_list.assert_called_once_with(ref="sha123")
-        assert not inventory_manager.jmx_models_index_exists(snapshot_version)
-        mock_jmx_model_extractor.discover_jmx_model_paths.assert_not_called()
 
     def test_process_latest_release_backfills_missing_readmes(
         self, mock_client, inventory_manager, mock_jmx_model_extractor
@@ -483,32 +389,6 @@ libraries:
         assert version == Version("2.30.0")
         assert not inventory_manager.jmx_models_index_exists(version)
         assert not inventory_manager.get_jmx_store_dir().exists()
-
-
-@pytest.mark.parametrize("failure", [None, "discovery", "fetch"])
-def test_snapshot_prunes_only_after_complete_fetch(tmp_path, failure):
-    manager = InventoryManager(str(tmp_path))
-    old = Version("1.0.1-SNAPSHOT")
-    manager.save_library_readmes(old, [("old", "snapshot-only")])
-    old_file = next((tmp_path / "library_readmes").glob("*.md"))
-    client = Mock()
-    client.get_latest_release_tag.return_value = "v2.0.0"
-    client.resolve_ref_to_sha.return_value = "a" * 40
-    client.fetch_instrumentation_list.return_value = (
-        "file_format: 0.5\nlibraries:\n  instrumentation:\n  - name: new\n    source_path: instrumentation/new\n"
-    )
-    extractor = Mock()
-    extractor.discover_library_readmes.return_value = {"instrumentation/new": "new/README.md"}
-    extractor.fetch_readme.return_value = "replacement"
-    if failure == "discovery":
-        extractor.discover_library_readmes.side_effect = GithubAPIError("discovery failed")
-    elif failure == "fetch":
-        extractor.fetch_readme.side_effect = GithubAPIError("fetch failed")
-    sync = InstrumentationSync(client, manager, readme_extractor=extractor)
-    version = sync.update_snapshot()
-    assert old_file.exists() == (failure is not None)
-    assert manager.readme_index_exists(version) == (failure is None)
-    assert not manager.get_version_dir(old).exists()
 
 
 @pytest.mark.parametrize("failure", ["discovery", "fetch"])
