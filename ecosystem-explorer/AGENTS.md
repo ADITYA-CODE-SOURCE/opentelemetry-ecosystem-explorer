@@ -15,7 +15,7 @@ All commands run from `ecosystem-explorer/` with `bun`:
 - `bun run serve` — Vite dev server
 - `bun run build` — Production build (typecheck failures block the build)
 - `bun run typecheck` — TypeScript check without emit
-- `bun run lint` — ESLint
+- `bun run lint` — Oxlint via `vp lint` (config in the `lint` block of `vite.config.ts`)
 - `bun run format` — Prettier write
 - `bun run test` — Unit tests (Vitest with jsdom)
 - `bun run test -t "<name>"` — Run a single unit test by name

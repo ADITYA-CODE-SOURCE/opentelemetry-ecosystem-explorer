@@ -21,9 +21,9 @@ import type { InstrumentationData, Metric } from "@/types/javaagent";
 describe("release-diff utility", () => {
   const mockInstrumentation = (
     name: string,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // oxlint-disable-next-line @typescript-eslint/no-explicit-any
     metrics: any[] = [],
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // oxlint-disable-next-line @typescript-eslint/no-explicit-any
     spans: any[] = []
   ): InstrumentationData => ({
     name,

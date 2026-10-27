@@ -313,7 +313,7 @@ function draftEvent(draft: TimelineData, id: string) {
 
 describe("validateHistory on malformed files", () => {
   // Deliberately loose: these tests hand the validator shapes the types forbid.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // oxlint-disable-next-line @typescript-eslint/no-explicit-any
   type Loose = Record<string, any>;
   const validate = (mutate: (draft: Loose) => void) => {
     const draft = clone(data) as unknown as Loose;

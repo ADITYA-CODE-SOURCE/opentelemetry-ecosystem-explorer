@@ -132,7 +132,7 @@ export function SearchFacet({
   // `value` would re-fire the stale pre-clear text when the parent clears.
   useEffect(() => {
     if (debounced !== value) onChange(debounced);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [debounced]);
 
   return (

@@ -103,7 +103,7 @@ export function useActiveSection(
       window.removeEventListener("resize", scheduleCompute);
     };
     // depKey is a derived primitive; sectionKeys identity may change per render
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [depKey, containerRef]);
 
   const scrollToSection = useCallback(
