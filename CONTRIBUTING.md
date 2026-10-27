@@ -246,7 +246,7 @@ Before committing changes, run these checks to ensure your code will pass our CI
 # Run all linting (Markdown, Oxlint, Ruff)
 bun run lint
 
-# Run all formatting (Prettier, Ruff)
+# Run all formatting (Oxfmt, Ruff)
 bun run format
 uv run ruff format .
 

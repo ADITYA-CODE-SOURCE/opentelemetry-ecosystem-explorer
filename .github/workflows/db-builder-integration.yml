@@ -121,11 +121,11 @@ jobs:
           done
           rm -rf "${RUNNER_TEMP}/built-tree"
 
-      - name: The manifest writer emits prettier-clean output and rewrites only changed blocks
+      - name: The manifest writer emits format-clean output and rewrites only changed blocks
         env:
-          # Beside the real manifest, so prettier finds the repository's own config by searching
-          # upward and bunx resolves the explorer's installed prettier. A probe under RUNNER_TEMP
-          # would get prettier's defaults and an unpinned download, a weaker check than
+          # Beside the real manifest, so `vp fmt` finds the repository's own config by searching
+          # upward and bunx resolves the explorer's installed vp. A probe under RUNNER_TEMP
+          # would get the formatter's defaults and an unpinned download, a weaker check than
           # format:check. Not the real path: that file is tracked once the first nightly lands, and
           # this step would overwrite it with fabricated values while later steps still run.
           MANIFEST: ecosystem-explorer/public/data-manifest-probe.json
@@ -141,7 +141,7 @@ jobs:
               --archive-sha256 "$(sha256sum "${RUNNER_TEMP}/archives/$eco.tar.gz" | cut -d' ' -f1)" \
               --registry-commit "$GITHUB_SHA"
           done
-          (cd ecosystem-explorer && bunx prettier --check public/data-manifest-probe.json --ignore-path ../.prettierignore)
+          (cd ecosystem-explorer && bunx vp fmt --check public/data-manifest-probe.json)
 
           # Rewriting one block must leave every other block byte-identical.
           cp "$MANIFEST" "${RUNNER_TEMP}/manifest-before.json"

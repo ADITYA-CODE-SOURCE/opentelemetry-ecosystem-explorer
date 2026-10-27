@@ -48,7 +48,7 @@ reviewing.
 
 ## Things you should NOT flag
 
-- Style enforced by Ruff, ESLint, Prettier, or markdownlint — all four run in CI.
+- Style enforced by Ruff, Oxlint, Oxfmt, or markdownlint — all four run in CI.
 - Existing patterns adjacent to the change. Stay focused on the diff.
 - Missing PR template fields, screenshots, or changelog entries.
 - Lockfile churn (`bun.lock`, `package-lock.json`, `uv.lock`) when the `package.json` or
