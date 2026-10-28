@@ -23,7 +23,7 @@ from dotnet_instrumentation_watcher.main import main
 @patch("dotnet_instrumentation_watcher.main.InstrumentationSync")
 def test_main_success(mock_sync, mock_inventory, mock_client):
     mock_sync_instance = mock_sync.return_value
-    mock_sync_instance.sync.return_value = {"new_release": "1.0.0", "snapshot_updated": "1.0.1-SNAPSHOT"}
+    mock_sync_instance.sync.return_value = {"new_release": "1.0.0"}
 
     with patch("sys.argv", ["dotnet-instrumentation-watcher"]):
         assert main() is None
