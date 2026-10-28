@@ -62,13 +62,13 @@ const NO_OP_CONTEXT: SectionExpansionContextValue = {
   overrides: {},
   setOverride: () => {},
 };
-// eslint-disable-next-line react-refresh/only-export-components
+// oxlint-disable-next-line react-refresh/only-export-components
 export function useSectionExpansion(): SectionExpansionContextValue {
   const ctx = useContext(SectionExpansionContext);
   return ctx ?? NO_OP_CONTEXT;
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
+// oxlint-disable-next-line react-refresh/only-export-components
 export function resolveBulkOpen(
   ctx: Pick<SectionExpansionContextValue, "bulkAction" | "overrides">,
   key: string,
@@ -85,7 +85,7 @@ export interface CollapsibleExpansion {
   onOpenChange: (next: boolean) => void;
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
+// oxlint-disable-next-line react-refresh/only-export-components
 export function useCollapsibleExpansion(
   key: string,
   defaultExpanded: boolean,

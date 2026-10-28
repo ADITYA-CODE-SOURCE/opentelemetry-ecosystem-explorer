@@ -55,7 +55,7 @@ export function useTelemetryComparison(
   // Allows the in-flight loadComparison() closure below to read the latest whenCondition
   // instead of the value captured when the effect was created (see #795).
   const whenConditionRef = useRef(whenCondition);
-  // eslint-disable-next-line react-hooks/refs
+  // oxlint-disable-next-line react-hooks/refs
   whenConditionRef.current = whenCondition;
 
   const fromVersion = customFromVersion ?? initialFromVersion;
@@ -160,7 +160,7 @@ export function useTelemetryComparison(
     if (fromVersion === toVersion) return;
     const diff = compareTelemetry(fromInstrRef.current, toInstrRef.current, whenCondition);
     setDiffResult(diff);
-  }, [whenCondition]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [whenCondition]); // oxlint-disable-line react-hooks/exhaustive-deps
 
   return {
     fromVersion,

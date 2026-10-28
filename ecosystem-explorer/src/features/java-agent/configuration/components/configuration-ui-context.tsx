@@ -18,10 +18,12 @@ import { createContext, useContext } from "react";
 const ListItemContext = createContext(false);
 const StarterPathsContext = createContext<Set<string>>(new Set());
 
+// oxlint-disable-next-line react-refresh/only-export-components
 export function useListItemContext(): boolean {
   return useContext(ListItemContext);
 }
 
+// oxlint-disable-next-line react-refresh/only-export-components
 export function useStarterPaths(): Set<string> {
   return useContext(StarterPathsContext);
 }

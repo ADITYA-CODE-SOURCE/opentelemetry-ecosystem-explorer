@@ -18,15 +18,14 @@ Process:
   releases with completed indexes
 - Download the `instrumentation-list.yaml` file for the release
 - Parse and normalize the data using version-specific parsers
-- Create or update versioned snapshots of instrumentation metadata in YAML format
+- Create or update versioned releases of instrumentation metadata in YAML format
 - Discover and fetch each instrumentation's upstream `library/README.md` and store it in the shared
   `library_readmes/` directory, then publish the version's `library-readmes.yaml` index
 - For releases, discover and fetch JMX weaver model YAML files from
   `instrumentation/jmx-metrics/model/*.yaml`, store them content-addressed once in a shared `jmx/`
   directory, and write a per-release `jmx-models.yaml` index
-- Update snapshot from the `main` branch
 
-It maintains a versioned inventory of instrumentation snapshots in the
+It maintains a versioned inventory of instrumentation metadata in the
 `ecosystem-registry/java/javaagent` directory. Each version directory contains the aggregated
 `instrumentation.yaml` plus a `library-readmes.yaml` index mapping raw library names to filenames in
 the shared `library_readmes/` store. An empty index records successful discovery with no matching

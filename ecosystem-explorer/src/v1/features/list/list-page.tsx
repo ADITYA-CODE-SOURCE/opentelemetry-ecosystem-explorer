@@ -185,7 +185,7 @@ export function CollectorListPageV1() {
     } catch {
       /* ignore */
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function updateFilters(patch: Partial<ListFilters>, replace = false) {

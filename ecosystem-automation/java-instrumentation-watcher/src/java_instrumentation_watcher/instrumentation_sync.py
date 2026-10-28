@@ -59,14 +59,12 @@ class InstrumentationSync:
 
         This will:
         1. Backfill missing release README indexes and process the latest release (if new)
-        2. Update the snapshot from main branch
 
         Returns:
             Summary dictionary with processing results
         """
         summary = {
             "new_release": None,
-            "snapshot_updated": None,
         }
 
         logger.info("Checking for latest release...")
@@ -76,11 +74,6 @@ class InstrumentationSync:
             logger.info(f"✓ Processed new release: {new_release}")
         else:
             logger.info("✓ Latest release already tracked")
-
-        logger.info("Updating snapshot from main branch...")
-        snapshot_version = self.update_snapshot()
-        summary["snapshot_updated"] = str(snapshot_version)
-        logger.info(f"✓ Updated snapshot: {snapshot_version}")
 
         return summary
 
@@ -120,7 +113,6 @@ class InstrumentationSync:
 
         Use each release's tag and existing inventory. Failed fetches remain retryable
         even after a newer release appears; completed indexes require no network calls.
-        Snapshots are handled separately by update_snapshot().
         """
         completed = []
         for version in self.inventory_manager.list_release_versions():
@@ -131,56 +123,6 @@ class InstrumentationSync:
             if self._sync_library_readmes(version, f"v{version}", instrumentations):
                 completed.append(version)
         return completed
-
-    def update_snapshot(self) -> Version:
-        """
-        Update snapshot version from main branch.
-
-        This will:
-        1. Determine next snapshot version
-        2. Fetch from main branch
-        3. Clean up old snapshots
-        4. Save new snapshot
-
-        Returns:
-            The snapshot version
-        """
-        latest_release_tag = self.client.get_latest_release_tag()
-        latest_release = Version(latest_release_tag.lstrip("v"))
-
-        # Create snapshot version (increment patch)
-        snapshot_version = Version(
-            major=latest_release.major,
-            minor=latest_release.minor,
-            patch=latest_release.patch + 1,
-            prerelease=("SNAPSHOT",),
-        )
-
-        try:
-            main_ref = self.client.resolve_ref_to_sha("main")
-        except GithubAPIError:
-            logger.warning("  Could not resolve main to SHA; falling back to branch ref")
-            main_ref = "main"
-
-        logger.info("  Fetching instrumentation list from main branch...")
-        yaml_content = self.client.fetch_instrumentation_list(ref=main_ref)
-        instrumentations = parse_instrumentation_yaml(yaml_content)
-
-        removed = self.inventory_manager.cleanup_snapshots()
-        if removed > 0:
-            logger.info(f"  Removed {removed} old snapshot(s)")
-
-        self.inventory_manager.save_versioned_inventory(
-            version=snapshot_version,
-            instrumentations=instrumentations,
-        )
-        if self._sync_library_readmes(snapshot_version, main_ref, instrumentations):
-            removed_readmes = self.inventory_manager.prune_orphan_readmes()
-            logger.info("  Pruned %s orphan README(s)", removed_readmes)
-        else:
-            logger.warning("  Skipping README pruning after incomplete snapshot fetch")
-
-        return snapshot_version
 
     def _sync_library_readmes(
         self,

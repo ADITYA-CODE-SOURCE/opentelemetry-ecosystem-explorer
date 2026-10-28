@@ -54,14 +54,26 @@ def test_process_latest_release_already_exists(mock_client, mock_inventory):
     mock_inventory.save_versioned_inventory.assert_not_called()
 
 
-def test_update_snapshot(mock_client, mock_inventory):
+def test_sync_new_release(mock_client, mock_inventory):
     mock_client.get_core_version.return_value = "1.2.3"
+    mock_inventory.version_exists.return_value = False
     mock_client.fetch_instrumentation_list.return_value = {"modules": []}
-    mock_inventory.cleanup_snapshots.return_value = 1
 
     sync = InstrumentationSync(mock_client, mock_inventory)
-    result = sync.update_snapshot()
+    summary = sync.sync()
 
-    assert result == Version("1.2.4-SNAPSHOT")
-    mock_inventory.cleanup_snapshots.assert_called_once()
+    assert summary["new_release"] == "1.2.3"
+    assert "snapshot_updated" not in summary
     mock_inventory.save_versioned_inventory.assert_called_once()
+
+
+def test_sync_no_new_release(mock_client, mock_inventory):
+    mock_client.get_core_version.return_value = "1.2.3"
+    mock_inventory.version_exists.return_value = True
+
+    sync = InstrumentationSync(mock_client, mock_inventory)
+    summary = sync.sync()
+
+    assert summary["new_release"] is None
+    assert "snapshot_updated" not in summary
+    mock_inventory.save_versioned_inventory.assert_not_called()

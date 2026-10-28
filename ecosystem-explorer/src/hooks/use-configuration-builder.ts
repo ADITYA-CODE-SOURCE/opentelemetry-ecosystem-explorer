@@ -339,7 +339,7 @@ export function useConfigurationBuilderState(
       setFieldError,
     }),
     // all callbacks are stable; resetToDefaults reads starter via ref
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
     []
   );
 

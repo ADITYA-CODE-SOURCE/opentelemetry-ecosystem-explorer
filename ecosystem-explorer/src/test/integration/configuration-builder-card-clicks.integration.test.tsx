@@ -33,6 +33,8 @@ beforeEach(() => {
 
 function mockYamlSectionVisibility(sectionKey: string, isVisible: boolean) {
   const scrollBySpy = vi.spyOn(Element.prototype, "scrollBy").mockImplementation(() => {});
+  // Not unbound in practice: the fallback below re-binds it with `.call(this)`.
+  // oxlint-disable-next-line typescript/unbound-method
   const originalGetBoundingClientRect = Element.prototype.getBoundingClientRect;
   const getBoundingClientRectSpy = vi
     .spyOn(Element.prototype, "getBoundingClientRect")

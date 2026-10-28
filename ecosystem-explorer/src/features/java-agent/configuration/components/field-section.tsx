@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/* eslint-disable react-refresh/only-export-components -- compound component pattern: FieldSection is a compound (Object.assign) and useFieldSectionCanAdd is a thin context-reader hook, both legitimately co-located. */
+/* oxlint-disable react-refresh/only-export-components -- compound component pattern: FieldSection is a compound (Object.assign) and useFieldSectionCanAdd is a thin context-reader hook, both legitimately co-located. */
 import { createContext, useContext, useId, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronDown, ChevronRight } from "lucide-react";

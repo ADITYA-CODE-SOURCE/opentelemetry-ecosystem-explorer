@@ -243,10 +243,10 @@ Reference implementations: [collector-watcher](https://github.com/jaydeluca/coll
 Before committing changes, run these checks to ensure your code will pass our CI pipeline:
 
 ```bash
-# Run all linting (Markdown, ESLint, Ruff)
+# Run all linting (Markdown, Oxlint, Ruff)
 bun run lint
 
-# Run all formatting (Prettier, Ruff)
+# Run all formatting (Oxfmt, Ruff)
 bun run format
 uv run ruff format .
 

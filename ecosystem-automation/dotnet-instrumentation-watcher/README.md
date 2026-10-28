@@ -19,10 +19,9 @@ Process:
   ecosystem version
 - Query all packages owned by the `OpenTelemetry` organization
 - Filter and classify packages by type (instrumentation, exporter, extension)
-- Create or update versioned snapshots of package metadata in YAML format
-- Update the SNAPSHOT version with the current state of NuGet
+- Create or update versioned releases of package metadata in YAML format
 
-It maintains a versioned inventory of snapshots in YAML format in the `ecosystem-registry/dotnet`
+It maintains a versioned inventory of releases in YAML format in the `ecosystem-registry/dotnet`
 directory.
 
 ### Data Processing
@@ -38,8 +37,8 @@ Packages are classified by name pattern:
 
 Packages flagged as deprecated by NuGet are also skipped.
 
-The version used for each registry snapshot is the latest stable version of the core `OpenTelemetry`
-package — not the individual package version — so all modules in a snapshot share the same ecosystem
+The version used for each registry release is the latest stable version of the core `OpenTelemetry`
+package — not the individual package version — so all modules in a release share the same ecosystem
 version. Individual module versions are recorded in the `version` field of each entry.
 
 Results are sorted by package name for deterministic registry output.

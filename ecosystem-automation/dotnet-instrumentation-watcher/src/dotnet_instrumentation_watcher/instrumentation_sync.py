@@ -47,14 +47,12 @@ class InstrumentationSync:
 
         This will:
         1. Process the latest release (if new)
-        2. Update the snapshot from main branch
 
         Returns:
             Summary dictionary with processing results
         """
         summary = {
             "new_release": None,
-            "snapshot_updated": None,
         }
 
         logger.info("Checking for latest release...")
@@ -64,11 +62,6 @@ class InstrumentationSync:
             logger.info(f"[*] Processed new release: {new_release}")
         else:
             logger.info("[*] Latest release already tracked")
-
-        logger.info("Updating snapshot from main branch...")
-        snapshot_version = self.update_snapshot()
-        summary["snapshot_updated"] = str(snapshot_version)
-        logger.info(f"[*] Updated snapshot: {snapshot_version}")
 
         return summary
 
@@ -99,43 +92,3 @@ class InstrumentationSync:
         )
 
         return version
-
-    def update_snapshot(self) -> Version:
-        """
-        Update snapshot version from NuGet data.
-
-        This will:
-        1. Determine next snapshot version
-        2. Fetch from NuGet
-        3. Clean up old snapshots
-        4. Save new snapshot
-
-        Returns:
-            The snapshot version
-        """
-        latest_version_string = self.client.get_core_version()
-        try:
-            latest_version = Version(latest_version_string)
-        except ValueError as e:
-            raise ValueError(f"Could not resolve a valid core version: {latest_version_string!r}") from e
-
-        snapshot_version = Version(
-            major=latest_version.major,
-            minor=latest_version.minor,
-            patch=latest_version.patch + 1,
-            prerelease=("SNAPSHOT",),
-        )
-
-        logger.info("  Fetching instrumentation list from NuGet...")
-        instrumentations = self.client.fetch_instrumentation_list()
-
-        removed = self.inventory_manager.cleanup_snapshots()
-        if removed > 0:
-            logger.info(f"  Removed {removed} old snapshot(s)")
-
-        self.inventory_manager.save_versioned_inventory(
-            version=snapshot_version,
-            instrumentations=instrumentations,
-        )
-
-        return snapshot_version
