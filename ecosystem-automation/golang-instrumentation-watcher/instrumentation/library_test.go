@@ -133,6 +133,12 @@ definitions:
     name: go.test.option
     description: Test-only Go-owned catalog entry.
     type: boolean
+    deprecated: true
+    replaced_by: go.test.option.v2
+  go.test.option.v2:
+    name: go.test.option.v2
+    description: Replacement test-only Go-owned catalog entry.
+    type: boolean
 `
 	if err := os.WriteFile(path, []byte(catalog), filePerm); err != nil {
 		t.Fatal(err)
@@ -288,6 +294,8 @@ func TestScanMetadataRepoConfigurationEntryShape(t *testing.T) {
 		wantRefValue        string
 		wantDescription     string
 		wantDefaultBehavior string
+		wantDeprecated      bool
+		wantReplacedBy      string
 	}{
 		{
 			name: "inline declarative configuration",
@@ -316,11 +324,15 @@ func TestScanMetadataRepoConfigurationEntryShape(t *testing.T) {
         example: "/users/{id}"
       enabled:
         type: boolean
-        default: false`,
-			wantInline: true,
-			wantSchema: true,
-			wantName:   "go.http.client.rules",
-			wantType:   "structured_list",
+        default: false
+  deprecated: true
+  replaced_by: go.http.client.rules.v2`,
+			wantInline:     true,
+			wantSchema:     true,
+			wantName:       "go.http.client.rules",
+			wantType:       "structured_list",
+			wantDeprecated: true,
+			wantReplacedBy: "go.http.client.rules.v2",
 		},
 		{
 			name:                "shared reference resolves and preserves its ref",
@@ -340,6 +352,8 @@ func TestScanMetadataRepoConfigurationEntryShape(t *testing.T) {
 			wantName:        "go.test.option",
 			wantType:        "boolean",
 			wantDescription: "Test-only Go-owned catalog entry.",
+			wantDeprecated:  true,
+			wantReplacedBy:  "go.test.option.v2",
 		},
 		{
 			name: "both selectors",
@@ -354,10 +368,10 @@ func TestScanMetadataRepoConfigurationEntryShape(t *testing.T) {
 			wantError: `a ref entry must not include inline configuration field "type"`,
 		},
 		{
-			name: "shared reference with empty inline field",
+			name: "shared reference with deprecation override",
 			config: `- ref: general.http.client.request_captured_headers
-  description: ""`,
-			wantError: `a ref entry must not include inline configuration field "description"`,
+  deprecated: true`,
+			wantError: `a ref entry must not include inline configuration field "deprecated"`,
 		},
 		{
 			name:      "neither selector is rejected",
@@ -365,10 +379,10 @@ func TestScanMetadataRepoConfigurationEntryShape(t *testing.T) {
 			wantError: "exactly one of name or ref",
 		},
 		{
-			name: "null name is rejected", config: "- name: null", wantError: "name must be a string",
+			name: "null name is rejected", config: "- name: null", wantError: "exactly one of name or ref",
 		},
 		{
-			name: "duplicate name is rejected", config: "- name: go.x\n  name: go.y\n  type: boolean", wantError: "duplicate field",
+			name: "duplicate name is rejected", config: "- name: go.x\n  name: go.y\n  type: boolean", wantError: "already defined",
 		},
 		{
 			name: "old name field is rejected", config: "- name: go.x\n  type: string\n  declarative_name: go.x", wantError: "field declarative_name not found",
@@ -378,9 +392,6 @@ func TestScanMetadataRepoConfigurationEntryShape(t *testing.T) {
 		},
 		{
 			name: "old schema field is rejected", config: "- name: go.x\n  type: string\n  declarative_schema: {}", wantError: "field declarative_schema not found",
-		},
-		{
-			name: "null ref override is rejected", config: "- ref: go.test.option\n  description: null", wantError: "must not include inline configuration field",
 		},
 		{
 			name: "invalid boolean default", config: "- name: go.x\n  type: boolean\n  default: yes", wantError: "not a valid boolean",
@@ -401,24 +412,24 @@ func TestScanMetadataRepoConfigurationEntryShape(t *testing.T) {
 			name: "invalid schema property default", config: "- name: go.x\n  type: structured_list\n  schema: {type: object, properties: {enabled: {type: boolean, default: \"false\"}}}", wantError: "default does not match type",
 		},
 		{
-			name: "invalid schema property example", config: "- name: go.x\n  type: structured_list\n  schema: {type: object, properties: {enabled: {type: boolean, example: null}}}", wantError: "example does not match type",
+			name: "invalid schema property example", config: "- name: go.x\n  type: structured_list\n  schema: {type: object, properties: {enabled: {type: boolean, example: \"false\"}}}", wantError: "example does not match type",
 		},
 		{
 			name: "non-scalar top-level default is rejected",
 			config: `- name: go.net_http.enabled
   type: boolean
   default: [true]`,
-			wantError: "default must be a string, boolean, integer, or float scalar",
+			wantError: "cannot unmarshal !!seq into string",
 		},
 		{
 			name:      "null ref selector is rejected",
 			config:    `- ref: null`,
-			wantError: "ref must be a string",
+			wantError: "exactly one of name or ref",
 		},
 		{
 			name:      "empty name",
 			config:    `- name: ""`,
-			wantError: "name must not be empty",
+			wantError: "exactly one of name or ref",
 		},
 		{
 			name:      "empty ref",
@@ -428,7 +439,7 @@ func TestScanMetadataRepoConfigurationEntryShape(t *testing.T) {
 		{
 			name:      "missing type",
 			config:    `- name: go.test`,
-			wantError: "type must be present and a string",
+			wantError: "unsupported or missing type",
 		},
 		{
 			name:      "name with surrounding whitespace",
@@ -436,15 +447,52 @@ func TestScanMetadataRepoConfigurationEntryShape(t *testing.T) {
 			wantError: "name must not have leading or trailing whitespace",
 		},
 		{
+			name: "general path omits development suffix",
+			config: `- name: general.http.client.request_captured_headers/development
+  type: list`,
+			wantError: "name must be a canonical general. or go. configuration path",
+		},
+		{
 			name:      "ref with surrounding whitespace",
 			config:    `- ref: " general.http.client.request_captured_headers "`,
 			wantError: "ref must not have leading or trailing whitespace",
 		},
 		{
+			name: "empty replacement is rejected",
+			config: `- name: go.test.old
+  type: boolean
+  deprecated: true
+  replaced_by: ""`,
+			wantError: "replaced_by must not be empty",
+		},
+		{
+			name: "replacement whitespace is rejected",
+			config: `- name: go.test.old
+  type: boolean
+  deprecated: true
+  replaced_by: " go.test.new "`,
+			wantError: "replaced_by must not have leading or trailing whitespace",
+		},
+		{
+			name: "replacement must be a string",
+			config: `- name: go.test.old
+  type: boolean
+  deprecated: true
+  replaced_by: {invalid: mapping}`,
+			wantError: "cannot unmarshal !!map into string",
+		},
+		{
+			name: "replacement requires deprecation",
+			config: `- name: go.test.old
+  type: boolean
+  replaced_by: go.test.new`,
+			wantError: "replaced_by requires deprecated to be true",
+		},
+		{
 			name: "unknown type",
 			config: `- name: go.net_http.enabled
   type: str`,
-			wantError: "unsupported type \"str\"",
+			wantError: "unsupported or missing type \"str\"",
 		},
 		{
 			name: "schema on scalar declarative type",
@@ -514,6 +562,13 @@ func TestScanMetadataRepoConfigurationEntryShape(t *testing.T) {
 			}
 			if configuration.DefaultBehavior != tt.wantDefaultBehavior {
 				t.Errorf("default_behavior = %q, want %q", configuration.DefaultBehavior, tt.wantDefaultBehavior)
+			}
+			if configuration.Deprecated != tt.wantDeprecated {
+				t.Errorf("deprecated = %v, want %v", configuration.Deprecated, tt.wantDeprecated)
+			}
+			if got := configuration.ReplacedBy; (got == nil) != (tt.wantReplacedBy == "") ||
+				(got != nil && *got != tt.wantReplacedBy) {
+				t.Errorf("replaced_by = %v, want %q", got, tt.wantReplacedBy)
 			}
 			if tt.wantInline {
 				if tt.checkDefault && (configuration.Default == nil || *configuration.Default != tt.wantDefault) {

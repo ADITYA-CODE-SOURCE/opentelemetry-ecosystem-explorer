@@ -79,6 +79,7 @@ func TestSaveAndLoadDeclarativeConfiguration(t *testing.T) {
 	defaultValue := "[]"
 	emptyDefault := ""
 	ref := "general.http.client.request_captured_headers"
+	replacedBy := "go.net_http.rules.v2"
 	want := []metadata.Configuration{
 		{
 			Name:        "go.net_http.rules",
@@ -86,6 +87,8 @@ func TestSaveAndLoadDeclarativeConfiguration(t *testing.T) {
 			Type:        "structured_list",
 			Default:     &defaultValue,
 			Examples:    []string{"[]"},
+			Deprecated:  true,
+			ReplacedBy:  &replacedBy,
 			Schema: &metadata.ConfigurationSchema{
 				Type:     "object",
 				Required: []string{"enabled"},

@@ -104,12 +104,18 @@ refs and missing or invalid catalogs fail the scan with a source-path diagnostic
 Repositories without refs do not need a catalog. Scanning never downloads a
 catalog or runs otelc code.
 
-Input refs do not allow inline overrides. Inventory records preserve the raw
-`ref` and carry resolved `name`, `type`, description, and schema fields. Loading
-inventory does not reapply source-only selector exclusivity. `file_format` stays
+Input refs are catalog-only and cannot set non-empty inline configuration values.
+Inventory records preserve the raw `ref` and carry resolved `name`, `type`,
+description, and schema fields. Loading inventory does not reapply source-only
+selector exclusivity. `file_format` stays
 at `0.1`; inventories without configurations remain readable and are not backfilled.
 Top-level defaults remain strings (boolean/numeric YAML scalars are normalized),
 while schema property defaults and examples retain their native YAML types.
+Configuration definitions may include optional `deprecated` and `replaced_by`
+metadata. `replaced_by` requires `deprecated: true`, and deprecated entries may
+omit a replacement. The watcher preserves these fields through ref resolution and
+inventory serialization; parser compatibility for removed fields and user-facing
+Explorer deprecation display are separate concerns.
 Optional `default_behavior` describes prose behavior, not a machine-readable
 default. This watcher publishes Go inventory; it does not change Java's metadata
 format or add a Go UI/database-builder integration.

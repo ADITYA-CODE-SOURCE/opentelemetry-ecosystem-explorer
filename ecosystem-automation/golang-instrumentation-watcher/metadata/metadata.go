@@ -193,6 +193,10 @@ type Configuration struct {
 	Schema *ConfigurationSchema `yaml:"schema,omitempty"`
 	// DefaultBehavior describes the default behavior when the declarative option is unset.
 	DefaultBehavior string `yaml:"default_behavior,omitempty"`
+	// Deprecated indicates that this configuration option should no longer be used.
+	Deprecated bool `yaml:"deprecated,omitempty"`
+	// ReplacedBy identifies the configuration path that supersedes this option, when available.
+	ReplacedBy *string `yaml:"replaced_by,omitempty"`
 }
 
 // ConfigurationSchema is the object-schema subset used for structured_list items.
