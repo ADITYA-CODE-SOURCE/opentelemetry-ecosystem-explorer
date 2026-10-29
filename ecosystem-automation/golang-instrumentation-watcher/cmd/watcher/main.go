@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 
@@ -55,8 +56,54 @@ type Target struct {
 	Branch   string         `yaml:"branch,omitempty"`
 }
 
+// ConfigurationCatalogTarget describes the central otelc checkout and catalog
+// file used to resolve refs from every metadata-scanned repository.
+type ConfigurationCatalogTarget struct {
+	URL  string `yaml:"url"`
+	Ref  string `yaml:"ref"`
+	Path string `yaml:"path"`
+}
+
 type TargetsConfig struct {
-	Targets []Target `yaml:"targets"`
+	Targets              []Target                    `yaml:"targets"`
+	ConfigurationCatalog *ConfigurationCatalogTarget `yaml:"configuration_catalog,omitempty"`
+}
+
+func parseTargetsConfig(data []byte) (TargetsConfig, error) {
+	var config TargetsConfig
+	decoder := yaml.NewDecoder(bytes.NewReader(data))
+	decoder.KnownFields(true)
+	if err := decoder.Decode(&config); err != nil {
+		return TargetsConfig{}, fmt.Errorf("parse targets configuration: %w", err)
+	}
+	if source := config.ConfigurationCatalog; source != nil {
+		if strings.TrimSpace(source.URL) == "" || strings.TrimSpace(source.URL) != source.URL {
+			return TargetsConfig{}, fmt.Errorf("configuration_catalog.url must be a non-empty URL without surrounding whitespace")
+		}
+		if strings.TrimSpace(source.Ref) == "" || strings.TrimSpace(source.Ref) != source.Ref {
+			return TargetsConfig{}, fmt.Errorf("configuration_catalog.ref must be a non-empty ref without surrounding whitespace")
+		}
+		if strings.TrimSpace(source.Path) == "" || strings.TrimSpace(source.Path) != source.Path {
+			return TargetsConfig{}, fmt.Errorf("configuration_catalog.path must be a non-empty relative path")
+		}
+		cleanPath := filepath.Clean(filepath.FromSlash(source.Path))
+		if filepath.IsAbs(cleanPath) || cleanPath == ".." || strings.HasPrefix(cleanPath, ".."+string(filepath.Separator)) {
+			return TargetsConfig{}, fmt.Errorf("configuration_catalog.path must stay within the catalog checkout")
+		}
+	}
+	return config, nil
+}
+
+func loadConfigurationCatalog(baseDir string, source *ConfigurationCatalogTarget) (*instrumentation.ConfigurationCatalog, error) {
+	if source == nil {
+		return nil, nil
+	}
+	repoInfo, err := repo.CheckoutAt(source.URL, baseDir, source.Ref)
+	if err != nil {
+		return nil, fmt.Errorf("checkout central configuration catalog: %w", err)
+	}
+	catalogPath := filepath.Join(repoInfo.Path, filepath.FromSlash(source.Path))
+	return instrumentation.LoadConfigurationCatalog(catalogPath)
 }
 
 // repoRoot walks up from dir until it finds a directory that contains an
@@ -106,10 +153,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	var config TargetsConfig
-	dec := yaml.NewDecoder(bytes.NewReader(data))
-	dec.KnownFields(true)
-	if err := dec.Decode(&config); err != nil {
+	config, err := parseTargetsConfig(data)
+	if err != nil {
 		log.WithErrorMsg(err, "failed to parse targets file", "file", *targetsFile)
 		os.Exit(1)
 	}
@@ -117,12 +162,17 @@ func main() {
 	if len(config.Targets) == 0 {
 		log.Warn("No targets found in configuration", "file", *targetsFile)
 	}
+	catalog, err := loadConfigurationCatalog(*baseDir, config.ConfigurationCatalog)
+	if err != nil {
+		log.WithErrorMsg(err, "failed to load central configuration catalog")
+		os.Exit(1)
+	}
 
 	failed := false
 	for _, target := range config.Targets {
 		inventoryDir := filepath.Join(root, "ecosystem-registry", "go", repo.CloneDirName(target.URL))
 
-		if err := syncRepo(log, target, *baseDir, inventoryDir); err != nil {
+		if err := syncRepo(log, target, *baseDir, inventoryDir, catalog); err != nil {
 			log.WithErrorMsg(err, "sync failed for target", "url", target.URL)
 			failed = true
 		}
@@ -133,7 +183,7 @@ func main() {
 	}
 }
 
-func syncRepo(log *conf.Log, target Target, baseDir, inventoryDir string) error {
+func syncRepo(log *conf.Log, target Target, baseDir, inventoryDir string, catalog *instrumentation.ConfigurationCatalog) error {
 	branch := target.Branch
 	if branch == "" {
 		branch = mainBranch
@@ -154,19 +204,19 @@ func syncRepo(log *conf.Log, target Target, baseDir, inventoryDir string) error 
 
 		if mgr.VersionExists(releaseTag) {
 			log.Info("Release already inventoried ⏭️", "version", releaseTag, "url", target.URL)
-		} else if err := syncVersion(log, target, baseDir, mgr, releaseTag, releaseTag, false); err != nil {
+		} else if err := syncVersion(log, target, baseDir, mgr, releaseTag, releaseTag, false, catalog); err != nil {
 			return err
 		}
 
-		return syncVersion(log, target, baseDir, mgr, branch, snapshotVersion, true)
+		return syncVersion(log, target, baseDir, mgr, branch, snapshotVersion, true, catalog)
 	}
 
 	// No tags found, so just sync the branch as a snapshot
 	const snapshotVersion = "v0.0.1-SNAPSHOT"
-	return syncVersion(log, target, baseDir, mgr, branch, snapshotVersion, true)
+	return syncVersion(log, target, baseDir, mgr, branch, snapshotVersion, true, catalog)
 }
 
-func syncVersion(log *conf.Log, target Target, baseDir string, mgr *inventory.Manager, ref, version string, snapshot bool) error {
+func syncVersion(log *conf.Log, target Target, baseDir string, mgr *inventory.Manager, ref, version string, snapshot bool, catalog *instrumentation.ConfigurationCatalog) error {
 	repoInfo, err := repo.CheckoutAt(target.URL, baseDir, ref)
 	if err != nil {
 		return err
@@ -178,7 +228,7 @@ func syncVersion(log *conf.Log, target Target, baseDir string, mgr *inventory.Ma
 	case ParserGoMod:
 		result, err = instrumentation.ScanRepo(repoInfo.Path)
 	case ParserMetadata:
-		result, err = instrumentation.ScanMetadataRepo(repoInfo.Path)
+		result, err = instrumentation.ScanMetadataRepo(repoInfo.Path, catalog)
 	}
 
 	if err != nil {

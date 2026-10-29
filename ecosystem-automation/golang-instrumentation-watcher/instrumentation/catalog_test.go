@@ -10,7 +10,7 @@ import (
 func TestConfigurationCatalogValidation(t *testing.T) {
 	root := t.TempDir()
 	writeConfigurationCatalog(t, root)
-	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(configurationCatalogPath)))
+	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(DefaultConfigurationCatalogPath)))
 	if err != nil {
 		t.Fatal(err)
 	}

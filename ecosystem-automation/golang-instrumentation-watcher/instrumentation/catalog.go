@@ -2,18 +2,24 @@ package instrumentation
 
 import (
 	"fmt"
+	"maps"
 	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 
 	"github.com/open-telemetry/opentelemetry-ecosystem-explorer/golang-instrumentation-watcher/metadata"
 )
 
-// configurationCatalogPath is relative to the root of the checked-out otelc
-// repository. The Go watcher scans that same checkout, so the catalog and
-// metadata.yaml are always read from one revision without network access.
-const configurationCatalogPath = "tool/internal/configuration/catalog.yaml"
+// DefaultConfigurationCatalogPath is the location of the central catalog in
+// the otelc repository. The watcher loads it separately from scanned repos.
+const DefaultConfigurationCatalogPath = "tool/internal/configuration/catalog.yaml"
+
+// ConfigurationCatalog contains the central ref definitions supplied to a
+// metadata scan. SourcePath is retained for diagnostics.
+type ConfigurationCatalog struct {
+	SourcePath  string
+	Definitions map[string]metadata.Configuration
+}
 
 type configurationCatalog struct {
 	CatalogVersion int                               `yaml:"catalog_version"`
@@ -28,13 +34,17 @@ type configurationCatalogSource struct {
 	File       string `yaml:"file"`
 }
 
-func readConfigurationCatalog(repoPath string) (map[string]metadata.Configuration, error) {
-	path := filepath.Join(repoPath, filepath.FromSlash(configurationCatalogPath))
+// LoadConfigurationCatalog loads a catalog from its centrally configured path.
+func LoadConfigurationCatalog(path string) (*ConfigurationCatalog, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read configuration catalog %s: %w", path, err)
 	}
-	return parseConfigurationCatalog(data, path)
+	definitions, err := parseConfigurationCatalog(data, path)
+	if err != nil {
+		return nil, err
+	}
+	return &ConfigurationCatalog{SourcePath: path, Definitions: definitions}, nil
 }
 
 func parseConfigurationCatalog(data []byte, path string) (map[string]metadata.Configuration, error) {
@@ -54,13 +64,7 @@ func parseConfigurationCatalog(data []byte, path string) (map[string]metadata.Co
 		return nil, fmt.Errorf("configuration catalog %s has no definitions", path)
 	}
 
-	refs := make([]string, 0, len(catalog.Definitions))
-	for ref := range catalog.Definitions {
-		refs = append(refs, ref)
-	}
-	// Stable validation order makes the first reported invalid ref deterministic.
-	slices.Sort(refs)
-	for _, ref := range refs {
+	for _, ref := range slices.Sorted(maps.Keys(catalog.Definitions)) {
 		definition := catalog.Definitions[ref]
 		source := fmt.Sprintf("configuration catalog %s ref %q", path, ref)
 		if definition.Ref != nil {

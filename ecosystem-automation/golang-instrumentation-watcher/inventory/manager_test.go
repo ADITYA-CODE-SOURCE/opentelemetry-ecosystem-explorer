@@ -139,7 +139,8 @@ func TestSaveAndLoadDeclarativeConfiguration(t *testing.T) {
 func TestScanMetadataInventoryRoundTrip(t *testing.T) {
 	root := t.TempDir()
 	moduleDir := filepath.Join(root, "instrumentation", "dummy")
-	catalogDir := filepath.Join(root, "tool", "internal", "configuration")
+	catalogRoot := t.TempDir()
+	catalogDir := filepath.Join(catalogRoot, filepath.FromSlash(instrumentation.DefaultConfigurationCatalogPath))
 	for _, dir := range []string{moduleDir, catalogDir} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatal(err)
@@ -173,7 +174,11 @@ definitions:
 			t.Fatal(err)
 		}
 	}
-	scanned, err := instrumentation.ScanMetadataRepo(root)
+	catalog, err := instrumentation.LoadConfigurationCatalog(filepath.Join(catalogDir, "catalog.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	scanned, err := instrumentation.ScanMetadataRepo(root, catalog)
 	if err != nil {
 		t.Fatal(err)
 	}

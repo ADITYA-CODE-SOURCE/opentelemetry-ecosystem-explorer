@@ -113,7 +113,7 @@ func writeMetadata(t *testing.T, root, relDir, content string) {
 
 func writeConfigurationCatalog(t *testing.T, root string) {
 	t.Helper()
-	path := filepath.Join(root, filepath.FromSlash(configurationCatalogPath))
+	path := filepath.Join(root, filepath.FromSlash(DefaultConfigurationCatalogPath))
 	if err := os.MkdirAll(filepath.Dir(path), dirPerm); err != nil {
 		t.Fatal(err)
 	}
@@ -143,6 +143,16 @@ definitions:
 	if err := os.WriteFile(path, []byte(catalog), filePerm); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func loadTestConfigurationCatalog(t *testing.T, root string) *ConfigurationCatalog {
+	t.Helper()
+	path := filepath.Join(root, filepath.FromSlash(DefaultConfigurationCatalogPath))
+	catalog, err := LoadConfigurationCatalog(path)
+	if err != nil {
+		t.Fatalf("LoadConfigurationCatalog() error = %v", err)
+	}
+	return catalog
 }
 
 func TestScanMetadataRepo(t *testing.T) {
@@ -259,7 +269,7 @@ instalation: # typo should fail strict decoding
 
 			writeMetadata(t, root, "instrumentation/dummy", tt.metaConfig)
 
-			res, err := ScanMetadataRepo(root)
+			res, err := ScanMetadataRepo(root, nil)
 			if tt.wantError {
 				if err == nil {
 					t.Fatal("expected error, got nil")
@@ -458,6 +468,11 @@ func TestScanMetadataRepoConfigurationEntryShape(t *testing.T) {
 			wantError: "ref must not have leading or trailing whitespace",
 		},
 		{
+			name:      "ref must use a canonical namespace",
+			config:    `- ref: thirdparty.option`,
+			wantError: "ref must be a canonical general. or go. configuration path",
+		},
+		{
 			name: "empty replacement is rejected",
 			config: `- name: go.test.old
   type: boolean
@@ -523,11 +538,13 @@ func TestScanMetadataRepoConfigurationEntryShape(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			root := t.TempDir()
+			catalogRoot := t.TempDir()
 			writeGoMod(t, root, "instrumentation/dummy", "module go.opentelemetry.io/otelc/dummy\n\ngo 1.25.0\n")
-			writeConfigurationCatalog(t, root)
+			writeConfigurationCatalog(t, catalogRoot)
+			catalog := loadTestConfigurationCatalog(t, catalogRoot)
 			writeMetadata(t, root, "instrumentation/dummy", "name: test-lib\nconfigurations:\n"+tt.config+"\n")
 
-			result, err := ScanMetadataRepo(root)
+			result, err := ScanMetadataRepo(root, catalog)
 			if tt.wantError != "" {
 				if err == nil || !strings.Contains(err.Error(), tt.wantError) {
 					t.Fatalf("ScanMetadataRepo() error = %v, want error containing %q", err, tt.wantError)
@@ -600,15 +617,17 @@ func TestScanMetadataRepoConfigurationEntryShape(t *testing.T) {
 
 func TestScanMetadataRepoUnknownConfigurationRef(t *testing.T) {
 	root := t.TempDir()
+	catalogRoot := t.TempDir()
 	writeGoMod(t, root, "instrumentation/dummy", "module go.opentelemetry.io/otelc/dummy\n\ngo 1.25.0\n")
-	writeConfigurationCatalog(t, root)
+	writeConfigurationCatalog(t, catalogRoot)
+	catalog := loadTestConfigurationCatalog(t, catalogRoot)
 	writeMetadata(t, root, "instrumentation/dummy", `name: test-lib
 configurations:
-  - ref: general.unknown/development
+  - ref: general.unknown
 `)
 
-	_, err := ScanMetadataRepo(root)
-	if err == nil || !strings.Contains(err.Error(), `unknown configuration ref "general.unknown/development"`) {
+	_, err := ScanMetadataRepo(root, catalog)
+	if err == nil || !strings.Contains(err.Error(), `unknown configuration ref "general.unknown"`) {
 		t.Fatalf("ScanMetadataRepo() error = %v, want unknown ref diagnostic", err)
 	}
 	if !strings.Contains(err.Error(), filepath.Join(root, "instrumentation", "dummy", "metadata.yaml")) {
@@ -624,9 +643,9 @@ configurations:
   - ref: general.http.client.request_captured_headers
 `)
 
-	_, err := ScanMetadataRepo(root)
-	if err == nil || !strings.Contains(err.Error(), configurationCatalogPath) {
-		t.Fatalf("ScanMetadataRepo() error = %v, want catalog-path diagnostic", err)
+	_, err := ScanMetadataRepo(root, nil)
+	if err == nil || !strings.Contains(err.Error(), "requires a centrally loaded catalog") {
+		t.Fatalf("ScanMetadataRepo() error = %v, want central-catalog diagnostic", err)
 	}
 }
 
@@ -634,7 +653,7 @@ func TestScanMetadataRepoInlineConfigurationWithoutCatalog(t *testing.T) {
 	root := t.TempDir()
 	writeGoMod(t, root, "instrumentation/dummy", "module example.com/hooks\n\ngo 1.26.0\n")
 	writeMetadata(t, root, "instrumentation/dummy", "name: test-lib\nconfigurations:\n  - name: go.test.enabled\n    type: boolean\n    default: false\n")
-	result, err := ScanMetadataRepo(root)
+	result, err := ScanMetadataRepo(root, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

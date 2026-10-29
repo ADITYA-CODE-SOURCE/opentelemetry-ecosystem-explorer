@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"go/version"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -94,7 +95,7 @@ func analyzeLibrary(goModPath string) (*Library, error) {
 // ScanMetadataRepo walks the repository rooted at repoPath looking for
 // metadata.yaml files. It parses each file into a [Library] record, fusing
 // it into a [ScanResult].
-func ScanMetadataRepo(repoPath string) (*ScanResult, error) {
+func ScanMetadataRepo(repoPath string, catalog *ConfigurationCatalog) (*ScanResult, error) {
 	metaFiles, err := WalkMetadata(repoPath)
 	if err != nil {
 		return nil, err
@@ -122,8 +123,6 @@ func ScanMetadataRepo(repoPath string) (*ScanResult, error) {
 
 	var libraries []Library
 	seenNames := make(map[string]bool)
-	var catalog map[string]metadata.Configuration
-	catalogLoaded := false
 
 	for _, mf := range metaFiles {
 		lib, err := analyzeMetadataLibrary(mf.MetadataPath)
@@ -153,7 +152,7 @@ func ScanMetadataRepo(repoPath string) (*ScanResult, error) {
 		if err := lib.validateVersions(mf.MetadataPath); err != nil {
 			return nil, err
 		}
-		if err := resolveConfigurationRefs(lib, repoPath, mf.MetadataPath, &catalog, &catalogLoaded); err != nil {
+		if err := resolveConfigurationRefs(lib, catalog, mf.MetadataPath); err != nil {
 			return nil, err
 		}
 
@@ -240,6 +239,9 @@ func validateConfigurationValues(configurations []metadata.Configuration, metada
 			if strings.TrimSpace(ref) != ref {
 				return fmt.Errorf("%s: ref must not have leading or trailing whitespace", entrySource)
 			}
+			if !isConfigurationPath(ref) {
+				return fmt.Errorf("%s: ref must be a canonical general. or go. configuration path", entrySource)
+			}
 			for _, inlineField := range []struct {
 				name string
 				set  bool
@@ -313,12 +315,7 @@ func validateConfigurationValues(configurations []metadata.Configuration, metada
 					return fmt.Errorf("%s: schema required key %q is not defined", entrySource, key)
 				}
 			}
-			propertyNames := make([]string, 0, len(configuration.Schema.Properties))
-			for name := range configuration.Schema.Properties {
-				propertyNames = append(propertyNames, name)
-			}
-			slices.Sort(propertyNames)
-			for _, name := range propertyNames {
+			for _, name := range slices.Sorted(maps.Keys(configuration.Schema.Properties)) {
 				property := configuration.Schema.Properties[name]
 				propertySource := fmt.Sprintf("%s: schema property %q", entrySource, name)
 				if name == "" {
@@ -363,12 +360,7 @@ func validateCollectionDefault(configuration metadata.Configuration, source stri
 				return fmt.Errorf("%s: default[%d] required schema property %q is missing", source, i, required)
 			}
 		}
-		fieldNames := make([]string, 0, len(fields))
-		for key := range fields {
-			fieldNames = append(fieldNames, key)
-		}
-		slices.Sort(fieldNames)
-		for _, key := range fieldNames {
+		for _, key := range slices.Sorted(maps.Keys(fields)) {
 			propertyValue := fields[key]
 			property, exists := configuration.Schema.Properties[key]
 			if !exists || !configurationValueMatchesType(propertyValue, property.Type) {
@@ -416,6 +408,9 @@ func configurationValueMatchesType(value any, typeName string) bool {
 }
 
 func stringMap(value any) (map[string]any, bool) {
+	if values, ok := value.(map[string]any); ok {
+		return values, true
+	}
 	mapValue := reflect.ValueOf(value)
 	if !mapValue.IsValid() || mapValue.Kind() != reflect.Map || mapValue.Type().Key().Kind() != reflect.String {
 		return nil, false
@@ -449,31 +444,23 @@ func requireSingleYAMLDocument(decoder *yaml.Decoder) error {
 	return fmt.Errorf("must contain exactly one YAML document")
 }
 
-func resolveConfigurationRefs(
-	library *Library,
-	repoPath string,
-	metadataPath string,
-	catalog *map[string]metadata.Configuration,
-	catalogLoaded *bool,
-) error {
+func resolveConfigurationRefs(library *Library, catalog *ConfigurationCatalog, metadataPath string) error {
 	for i, sourceConfiguration := range library.Configurations {
 		if sourceConfiguration.Ref == nil {
 			continue
 		}
-		if !*catalogLoaded {
-			definitions, err := readConfigurationCatalog(repoPath)
-			if err != nil {
-				return fmt.Errorf("resolve configurations in %s: %w", metadataPath, err)
-			}
-			*catalog = definitions
-			*catalogLoaded = true
+		ref := *sourceConfiguration.Ref
+		if !isConfigurationPath(ref) {
+			return fmt.Errorf("invalid configurations[%d] in %s: ref must be a canonical general. or go. configuration path", i, metadataPath)
 		}
-		definition, exists := (*catalog)[*sourceConfiguration.Ref]
+		if catalog == nil {
+			return fmt.Errorf("configuration ref %q in %s requires a centrally loaded catalog", ref, metadataPath)
+		}
+		definition, exists := catalog.Definitions[ref]
 		if !exists {
-			return fmt.Errorf("unknown configuration ref %q in %s: no matching definition in %s", *sourceConfiguration.Ref, metadataPath, filepath.Join(repoPath, filepath.FromSlash(configurationCatalogPath)))
+			return fmt.Errorf("unknown configuration ref %q in %s: no matching definition in %s", ref, metadataPath, catalog.SourcePath)
 		}
 		resolved := definition
-		ref := *sourceConfiguration.Ref
 		resolved.Ref = &ref
 		library.Configurations[i] = resolved
 	}

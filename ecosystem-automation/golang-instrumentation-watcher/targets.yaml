@@ -1,3 +1,10 @@
+# Load one shared catalog for every metadata target. The configured ref must
+# contain tool/internal/configuration/catalog.yaml (merge the otelc catalog PR first).
+configuration_catalog:
+  url: "https://github.com/open-telemetry/opentelemetry-go-compile-instrumentation.git"
+  ref: "main"
+  path: "tool/internal/configuration/catalog.yaml"
+
 targets:
   - url: "https://github.com/open-telemetry/opentelemetry-go-contrib.git"
     strategy: "gomod"

@@ -96,11 +96,21 @@ configurations:
   - ref: general.http.client.request_captured_headers
 ```
 
-The watcher lazily loads `tool/internal/configuration/catalog.yaml` from the exact otelc checkout
-being scanned. General definitions derive from a pinned OpenTelemetry Configuration release; otelc
-owns Go-specific definitions. Unknown refs and missing or invalid catalogs fail the scan with a
-source-path diagnostic. Repositories without refs do not need a catalog. Scanning never downloads a
-catalog or runs otelc code.
+The root `targets.yaml` configures one central otelc catalog source (`url`, `ref`, and path). The
+watcher checks it out and loads the catalog once, then passes the parsed definitions to each
+metadata scan; a scanned instrumentation repository does not need its own catalog file. General
+definitions derive from a pinned OpenTelemetry Configuration release, and otelc owns Go-specific
+definitions. Unknown refs and missing or invalid catalogs fail with source-path diagnostics.
+Inline-only metadata can be scanned without a catalog. Scanning never runs otelc code.
+
+The configured ref must contain the catalog file. For example:
+
+```yaml
+configuration_catalog:
+  url: https://github.com/open-telemetry/opentelemetry-go-compile-instrumentation.git
+  ref: main
+  path: tool/internal/configuration/catalog.yaml
+```
 
 Input refs are catalog-only and cannot set non-empty inline configuration values. Inventory records
 preserve the raw `ref` and carry resolved `name`, `type`, description, and schema fields. Loading
